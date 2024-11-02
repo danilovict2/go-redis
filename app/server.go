@@ -31,16 +31,17 @@ func main() {
 		go func() {
 			defer conn.Close()
 			for {
-				buf := make([]byte, 128)
-				_, err = conn.Read(buf)
-				
+				resp := NewResp(conn)
+				value, err := resp.Read()
+
 				if errors.Is(err, io.EOF) {
 					fmt.Println("Client closed the connections:", conn.RemoteAddr())
 					break
 				} else if err != nil {
 					fmt.Println("Error while reading the message")
 				}
-	
+				
+				fmt.Println(value.array[0].bulk)
 				conn.Write([]byte("+PONG\r\n"))
 			}
 		}()
