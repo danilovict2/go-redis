@@ -6,10 +6,10 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -38,11 +38,32 @@ func main() {
 					fmt.Println("Client closed the connections:", conn.RemoteAddr())
 					break
 				} else if err != nil {
-					fmt.Println("Error while reading the message")
+					fmt.Println("Error while reading the message:", err)
+					break
+				}
+
+				if value.typ != "array" {
+					fmt.Println("Invalid request, expected array")
+					break
+				}
+			
+				if len(value.array) == 0 {
+					fmt.Println("Invalid request, expected array length > 0")
+					break
+				}
+
+				command := strings.ToUpper(value.array[0].bulk)
+				handler, ok := Handlers[command]
+				if !ok {
+					fmt.Println("Invalid command: ", command)
+					break
 				}
 				
-				fmt.Println(value.array[0].bulk)
-				conn.Write([]byte("+PONG\r\n"))
+				writer := NewWriter(conn)
+				err = writer.Write(handler(value.array[1:]))
+				if err != nil {
+					fmt.Println("Error while writing the message:", err)
+				}
 			}
 		}()
 	}
