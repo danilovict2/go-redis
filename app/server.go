@@ -59,17 +59,17 @@ func handleConnection(conn net.Conn) {
 			break
 		}
 
-		if value.typ != "array" {
+		if value.Typ != "array" {
 			fmt.Println("Invalid request, expected array")
 			break
 		}
 
-		if len(value.array) == 0 {
+		if len(value.Array) == 0 {
 			fmt.Println("Invalid request, expected array length > 0")
 			break
 		}
 
-		command := strings.ToUpper(value.array[0].bulk)
+		command := strings.ToUpper(value.Array[0].Bulk)
 		handler, ok := Handlers[command]
 		if !ok {
 			fmt.Println("Invalid command: ", command)
@@ -77,7 +77,7 @@ func handleConnection(conn net.Conn) {
 		}
 
 		writer := NewWriter(conn)
-		if err = writer.Write(handler(value.array[1:])); err != nil {
+		if err = writer.Write(handler(value.Array[1:])); err != nil {
 			fmt.Println("Error while writing the message:", err)
 		}
 	}

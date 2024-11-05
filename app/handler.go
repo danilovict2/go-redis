@@ -5,9 +5,10 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
 
-var Handlers = map[string]func([]Value) Value{
+var Handlers = map[string]func([]resp.Value) resp.Value{
 	"PING":   ping,
 	"ECHO":   echo,
 	"SET":    set,
@@ -15,40 +16,40 @@ var Handlers = map[string]func([]Value) Value{
 	"CONFIG": config,
 }
 
-func ping(args []Value) Value {
-	return Value{typ: "string", str: "PONG"}
+func ping(args []resp.Value) resp.Value {
+	return resp.Value{Typ: "string", Str: "PONG"}
 }
 
-func echo(args []Value) Value {
+func echo(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return Value{typ: "error", str: "ERR wrong number of args for 'echo' command"}
+		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'echo' command"}
 	}
 
-	return Value{typ: "string", str: args[0].bulk}
+	return resp.Value{Typ: "string", Str: args[0].Bulk}
 }
 
 var SETs = map[string]string{}
 var SETsMu = sync.RWMutex{}
 
-func set(args []Value) Value {
+func set(args []resp.Value) resp.Value {
 	if len(args) != 2 && len(args) != 4 {
-		return Value{typ: "error", str: "ERR wrong number of args for 'set' command"}
+		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'set' command"}
 	}
 
-	key := args[0].bulk
-	value := args[1].bulk
+	key := args[0].Bulk
+	value := args[1].Bulk
 	SETsMu.Lock()
 	defer SETsMu.Unlock()
 
 	SETs[key] = value
 	if len(args) == 4 {
-		if args[2].bulk != "px" {
-			return Value{typ: "error", str: "ERR syntax error"}
+		if args[2].Bulk != "px" {
+			return resp.Value{Typ: "error", Str: "ERR syntax error"}
 		}
 
-		i64, err := strconv.ParseInt(args[3].bulk, 10, 64)
+		i64, err := strconv.ParseInt(args[3].Bulk, 10, 64)
 		if err != nil {
-			return Value{typ: "error", str: "value is not an integer or out of range"}
+			return resp.Value{Typ: "error", Str: "resp.value is not an integer or out of range"}
 		}
 
 		go func() {
@@ -57,7 +58,7 @@ func set(args []Value) Value {
 		}()
 	}
 
-	return Value{typ: "string", str: "OK"}
+	return resp.Value{Typ: "string", Str: "OK"}
 }
 
 func unset(key string) {
@@ -66,47 +67,47 @@ func unset(key string) {
 	SETsMu.Unlock()
 }
 
-func get(args []Value) Value {
+func get(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return Value{typ: "error", str: "ERR wrong number of args for 'get' command"}
+		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'get' command"}
 	}
 
-	key := args[0].bulk
+	key := args[0].Bulk
 	SETsMu.RLock()
 	val, ok := SETs[key]
 	SETsMu.RUnlock()
 
 	if !ok {
-		return Value{typ: "null"}
+		return resp.Value{Typ: "null"}
 	}
-	return Value{typ: "bulk", bulk: val}
+	return resp.Value{Typ: "bulk", Bulk: val}
 }
 
 var CONFIGs = map[string]string{}
 var CONFIGsMu = sync.RWMutex{}
 
-func config(args []Value) Value {
+func config(args []resp.Value) resp.Value {
 	if len(args) != 2 {
-		return Value{typ: "error", str: "ERR wrong number of arguments for 'config' command"}
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'config' command"}
 	}
 
-	switch args[0].bulk {
+	switch args[0].Bulk {
 	case "GET":
 		return configGet(args[1:])
 	default:
-		return Value{typ: "error", str: fmt.Sprintf("ERR unknown subcommand '%v'", args[0].bulk)}
+		return resp.Value{Typ: "error", Str: fmt.Sprintf("ERR unknown subcommand '%v'", args[0].Bulk)}
 	}
 }
 
-func configGet(args []Value) Value {
-	key := args[0].bulk
+func configGet(args []resp.Value) resp.Value {
+	key := args[0].Bulk
 	CONFIGsMu.RLock()
 	value, ok := CONFIGs[key]
 	CONFIGsMu.RUnlock()
 
-	ret := Value{typ: "array"}
+	ret := resp.Value{Typ: "array"}
 	if ok {
-		ret.array = append(ret.array, Value{typ: "bulk", bulk: key}, Value{typ: "bulk", bulk: value})
+		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
 	}
 
 	return ret
