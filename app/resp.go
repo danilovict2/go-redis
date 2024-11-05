@@ -194,5 +194,5 @@ func (v Value) marshalError() []byte {
 }
 
 func (v Value) marshalNull() []byte {
-	return []byte("_\r\n")
+	return []byte("$-1\r\n")
 }
