@@ -119,18 +119,12 @@ func keys(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'keys' command"}
 	}
 
-	CONFIGsMu.RLock()
-	path := CONFIGs["dir"] + "/" + CONFIGs["dbfilename"]
-	CONFIGsMu.RUnlock()
-
-	str, err := readFile(path)
-	if err != nil {
-		return resp.Value{Typ: "error", Str: err.Error()}
-	}
-
 	ret := resp.Value{Typ: "array"}
-	if len(str) > 0 {
-		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: str})
+	SETsMu.RLock()
+	for key := range SETs {
+		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: key})
 	}
+	SETsMu.RUnlock()
+
 	return ret
 }

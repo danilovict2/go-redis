@@ -42,6 +42,19 @@ func init() {
 	CONFIGs["dir"] = *dir;
 	CONFIGs["dbfilename"] = *dbfilename
 	CONFIGsMu.Unlock()
+
+	path := *dir + "/" + *dbfilename
+	mp, err := readFile(path)
+	if err != nil {
+		fmt.Println("Error reading the RDB file:", err)
+		return
+	}
+
+	SETsMu.Lock()
+	for key, value := range mp {
+		SETs[key] = value
+	}
+	SETsMu.Unlock()
 }
 
 func handleConnection(conn net.Conn) {

@@ -29,17 +29,22 @@ func parseTable(bytes []byte) []byte {
 	return bytes[start + 1 : end]
 }
 
-func readFile(path string) (string, error) {
+func readFile(path string) (map[string]string, error) {
 	c, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return map[string]string{}, err
 	}
 
 	if len(c) == 0 {
-		return "", nil
+		return map[string]string{}, nil
 	}
 
-	key := parseTable(c)
-	str := key[4 : 4 + key[3]]
-	return string(str), nil
+	content := parseTable(c)
+	key := content[4 : 4 + content[3]]
+	value := content[5 + content[3] : 5 + content[3] + content[4 + content[3]]]
+	
+	ret := make(map[string]string)
+	ret[string(key)] = string(value)
+	
+	return ret, nil
 }
