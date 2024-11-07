@@ -12,7 +12,6 @@ import (
 
 func main() {
 	fmt.Println("Logs from your program will appear here!")
-	configureFlags()
 
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
 	if err != nil {
@@ -34,8 +33,8 @@ func main() {
 	}
 }
 
-func configureFlags() {
-	dir := flag.String("dir", "/tmp/redis-files", "the path to the directory where the RDB file is stored")
+func init() {
+	dir := flag.String("dir", "./", "the path to the directory where the RDB file is stored")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "the name of the RDB file")
 	flag.Parse()
 

@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 	"strconv"
 	"sync"
 	"time"
-	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
@@ -14,6 +14,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"SET":    set,
 	"GET":    get,
 	"CONFIG": config,
+	"KEYS":   keys,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -110,5 +111,26 @@ func configGet(args []resp.Value) resp.Value {
 		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
 	}
 
+	return ret
+}
+
+func keys(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'keys' command"}
+	}
+
+	CONFIGsMu.RLock()
+	path := CONFIGs["dir"] + "/" + CONFIGs["dbfilename"]
+	CONFIGsMu.RUnlock()
+
+	str, err := readFile(path)
+	if err != nil {
+		return resp.Value{Typ: "error", Str: err.Error()}
+	}
+
+	ret := resp.Value{Typ: "array"}
+	if len(str) > 0 {
+		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: str})
+	}
 	return ret
 }
