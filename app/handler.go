@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
@@ -44,17 +46,23 @@ func set(args []resp.Value) resp.Value {
 
 	SETs[key] = value
 	if len(args) == 4 {
-		if args[2].Bulk != "px" {
+		var unit time.Duration
+		switch strings.ToUpper(args[2].Bulk) {
+		case "EX":
+			unit = time.Second
+		case "PX":
+			unit = time.Millisecond
+		default:
 			return resp.Value{Typ: "error", Str: "ERR syntax error"}
 		}
 
 		i64, err := strconv.ParseInt(args[3].Bulk, 10, 64)
 		if err != nil {
-			return resp.Value{Typ: "error", Str: "resp.value is not an integer or out of range"}
+			return resp.Value{Typ: "error", Str: "value is not an integer or out of range"}
 		}
 
 		go func() {
-			time.Sleep(time.Millisecond * time.Duration(i64))
+			time.Sleep(unit * time.Duration(i64))
 			unset(key)
 		}()
 	}
