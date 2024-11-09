@@ -21,12 +21,12 @@ func sliceIndex(data []byte, sep byte) int {
 	}
 
 	return -1
-}	
+}
 
 func parseTable(bytes []byte) []byte {
 	start := sliceIndex(bytes, opCodeRESIZEDB)
 	end := sliceIndex(bytes, opCodeEOF)
-	return bytes[start + 1 : end]
+	return bytes[start+1 : end]
 }
 
 func readFile(path string) (map[string]string, error) {
@@ -40,11 +40,23 @@ func readFile(path string) (map[string]string, error) {
 	}
 
 	content := parseTable(c)
-	key := content[4 : 4 + content[3]]
-	value := content[5 + content[3] : 5 + content[3] + content[4 + content[3]]]
-	
+	len := content[0]
 	ret := make(map[string]string)
-	ret[string(key)] = string(value)
-	
+	var j byte = 2
+	for i := byte(0); i < len; i++ {
+		// Skip Value Type Byte
+		j++
+
+		kLen := content[j]
+		key := content[j+1 : j+1+kLen]
+		j += kLen + 1
+
+		vLen := content[j]
+		value := content[j+1 : j+1+vLen]
+		j += vLen + 1
+		
+		ret[string(key)] = string(value)
+	}
+
 	return ret, nil
 }
