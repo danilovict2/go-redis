@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -80,7 +79,6 @@ func readFile(path string) error {
 		vLen := content[j]
 		value := content[j+1 : j+1+vLen]
 		j += vLen + 1
-		fmt.Println(expireOption, string(key), string(value))
 
 		args := make([]resp.Value, 2)
 		args[0] = resp.Value{Typ: "bulk", Bulk: string(key)}
