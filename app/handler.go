@@ -17,6 +17,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"GET":    get,
 	"CONFIG": config,
 	"KEYS":   keys,
+	"INFO":   info,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -61,7 +62,6 @@ func set(args []resp.Value) resp.Value {
 			return resp.Value{Typ: "error", Str: "value is not an integer or out of range"}
 		}
 
-		fmt.Println(unit * time.Duration(i64))
 		go func() {
 			time.Sleep(unit * time.Duration(i64))
 			unset(key)
@@ -135,5 +135,15 @@ func keys(args []resp.Value) resp.Value {
 	}
 	SETsMu.RUnlock()
 
+	return ret
+}
+
+func info(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'info' command"}
+	}
+
+	ret := resp.Value{Typ: "bulk"}
+	ret.Bulk = "role:master"
 	return ret
 }
