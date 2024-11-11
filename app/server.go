@@ -55,8 +55,23 @@ func init() {
 	err := readFile(path)
 	if err != nil {
 		fmt.Println("Error reading the RDB file:", err)
+	}
+
+	if *replicaof != "" {
+		sendHandshake(*replicaof)
+	}
+}
+
+func sendHandshake(replicaof string) {
+	master := strings.Split(replicaof, " ")
+	addres := fmt.Sprintf("%v:%v", master[0], master[1])
+	conn, err := net.Dial("tcp", addres)
+	if err != nil {
+		fmt.Println("Couldn't connect to the master at ", addres)
 		return
 	}
+
+	conn.Write([]byte("*1\r\n$4\r\nPING\r\n"))
 }
 
 func handleConnection(conn net.Conn) {
