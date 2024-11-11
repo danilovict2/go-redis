@@ -144,6 +144,14 @@ func info(args []resp.Value) resp.Value {
 	}
 
 	ret := resp.Value{Typ: "bulk"}
-	ret.Bulk = "role:master"
+	CONFIGsMu.RLock()
+	replicaof := CONFIGs["replicaof"]
+	CONFIGsMu.RUnlock()
+
+	if replicaof != "" {
+		ret.Bulk = "role:slave"
+	} else {
+		ret.Bulk = "role:master"
+	}
 	return ret
 }

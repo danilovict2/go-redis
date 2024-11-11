@@ -41,12 +41,14 @@ func init() {
 	dir := flag.String("dir", "./", "the path to the directory where the RDB file is stored")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "the name of the RDB file")
 	port := flag.String("port", "6379", "port number")
+	replicaof := flag.String("replicaof", "", "start redis in replica mode")
 	flag.Parse()
 
 	CONFIGsMu.Lock()
 	CONFIGs["dir"] = *dir;
 	CONFIGs["dbfilename"] = *dbfilename
 	CONFIGs["port"] = *port
+	CONFIGs["replicaof"] = *replicaof
 	CONFIGsMu.Unlock()
 
 	path := *dir + "/" + *dbfilename
