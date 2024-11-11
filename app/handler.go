@@ -61,6 +61,7 @@ func set(args []resp.Value) resp.Value {
 			return resp.Value{Typ: "error", Str: "value is not an integer or out of range"}
 		}
 
+		fmt.Println(unit * time.Duration(i64))
 		go func() {
 			time.Sleep(unit * time.Duration(i64))
 			unset(key)
