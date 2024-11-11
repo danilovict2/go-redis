@@ -143,15 +143,26 @@ func info(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'info' command"}
 	}
 
+	switch strings.ToUpper(args[0].Bulk) {
+	case "REPLICATION":
+		return infoReplication()
+	default:
+		return resp.Value{Typ: "bulk"}
+	}
+}
+
+func infoReplication() resp.Value {
 	ret := resp.Value{Typ: "bulk"}
+
 	CONFIGsMu.RLock()
 	replicaof := CONFIGs["replicaof"]
 	CONFIGsMu.RUnlock()
 
 	if replicaof != "" {
-		ret.Bulk = "role:slave"
+		ret.Bulk = "role:slave\r\n"
 	} else {
-		ret.Bulk = "role:master"
+		ret.Bulk = "role:master\r\nmaster_replid:8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb\r\nmaster_repl_offset:0\r\n"
 	}
-	return ret
+
+	return ret;
 }
