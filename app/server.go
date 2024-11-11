@@ -13,9 +13,13 @@ import (
 func main() {
 	fmt.Println("Logs from your program will appear here!")
 
-	l, err := net.Listen("tcp", "0.0.0.0:6379")
+	CONFIGsMu.RLock()
+	port := CONFIGs["port"]
+	CONFIGsMu.RUnlock()
+	
+	l, err := net.Listen("tcp", "0.0.0.0:" + port)
 	if err != nil {
-		fmt.Println("Failed to bind to port 6379")
+		fmt.Println("Failed to bind to port ", port)
 		os.Exit(1)
 	}
 
@@ -36,11 +40,13 @@ func main() {
 func init() {
 	dir := flag.String("dir", "./", "the path to the directory where the RDB file is stored")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "the name of the RDB file")
+	port := flag.String("port", "6379", "port number")
 	flag.Parse()
 
 	CONFIGsMu.Lock()
 	CONFIGs["dir"] = *dir;
 	CONFIGs["dbfilename"] = *dbfilename
+	CONFIGs["port"] = *port
 	CONFIGsMu.Unlock()
 
 	path := *dir + "/" + *dbfilename
