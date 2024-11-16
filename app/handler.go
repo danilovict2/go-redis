@@ -95,9 +95,6 @@ func get(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "bulk", Bulk: val}
 }
 
-var CONFIGs = map[string]string{}
-var CONFIGsMu = sync.RWMutex{}
-
 func config(args []resp.Value) resp.Value {
 	if len(args) != 2 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'config' command"}
@@ -113,9 +110,7 @@ func config(args []resp.Value) resp.Value {
 
 func configGet(args []resp.Value) resp.Value {
 	key := args[0].Bulk
-	CONFIGsMu.RLock()
-	value, ok := CONFIGs[key]
-	CONFIGsMu.RUnlock()
+	value, ok := server.configs[key]
 
 	ret := resp.Value{Typ: "array"}
 	if ok {
@@ -155,10 +150,7 @@ func info(args []resp.Value) resp.Value {
 
 func infoReplication() resp.Value {
 	ret := resp.Value{Typ: "bulk"}
-
-	CONFIGsMu.RLock()
-	replicaof := CONFIGs["replicaof"]
-	CONFIGsMu.RUnlock()
+	replicaof := server.replconf.host
 
 	if replicaof != "" {
 		ret.Bulk = "role:slave\r\n"
