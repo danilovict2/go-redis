@@ -107,6 +107,7 @@ func (s *Server) Handle(conn net.Conn) {
 	resp := NewResp(conn)
 	for {
 		value, err := resp.Read()
+		fmt.Println(value.Bulk)
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", conn.RemoteAddr())
 			break
@@ -117,12 +118,12 @@ func (s *Server) Handle(conn net.Conn) {
 
 		if value.Typ != "array" {
 			fmt.Println("Invalid request, expected array")
-			break
+			continue
 		}
 
 		if len(value.Array) < 1 {
 			fmt.Println("Invalid request, expected array length > 0")
-			break
+			continue
 		}
 
 		command := strings.ToUpper(value.Array[0].Bulk)
@@ -135,10 +136,10 @@ func (s *Server) Handle(conn net.Conn) {
 		writer := NewWriter(conn)
 		if err = writer.Write(handler(value.Array[1:])); err != nil {
 			fmt.Println("Error while writing the message:", err)
-			break
+			continue
 		}
 
-		if command == "SET" && len(s.slaves) > 0 {
+		if command == "SET" || command == "REPLCONF" && len(s.slaves) > 0 {
 			s.broadcastch <- value.Marshal()
 		}
 
@@ -155,6 +156,10 @@ func (s *Server) Handle(conn net.Conn) {
 				break
 			}
 
+			// Read the RDB to avoid errors
+			res := make([]byte, 1024)
+			_, _ = conn.Read(res)
+			
 			s.slaves = append(s.slaves, conn)
 		}
 	}

@@ -162,7 +162,22 @@ func infoReplication() resp.Value {
 }
 
 func replconf(args []resp.Value) resp.Value {
-	return resp.Value{Typ: "string", Str: "OK"}
+	switch strings.ToUpper(args[0].Bulk) {
+	case "GETACK":
+		return replconfgetack(args[1:])
+	default:
+		return resp.Value{Typ: "string", Str: "OK"}
+	}
+}
+
+func replconfgetack(args []resp.Value) resp.Value {
+	if args[0].Bulk != "*" {
+		return resp.Value{Typ: "error", Str: "Invalid GETACK parameter"}
+	}
+
+	ret := resp.Value{Typ: "array"}
+	ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: "REPLCONF"}, resp.Value{Typ: "bulk", Bulk: "ACK"}, resp.Value{Typ: "bulk", Bulk: "0"})
+	return ret
 }
 
 func psync(args []resp.Value) resp.Value {
