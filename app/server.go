@@ -107,7 +107,6 @@ func (s *Server) Handle(conn net.Conn) {
 	resp := NewResp(conn)
 	for {
 		value, err := resp.Read()
-		fmt.Println(value.Bulk)
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", conn.RemoteAddr())
 			break
@@ -133,13 +132,24 @@ func (s *Server) Handle(conn net.Conn) {
 			break
 		}
 
+		if (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") {
+			fmt.Println(s.slaves)
+			for _, server := range s.slaves {
+				comm := "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n"
+				server.Write([]byte(comm))
+				res := make([]byte, 1024)
+				server.Read(res)
+				fmt.Println(string(res))
+			}
+		}
+
 		writer := NewWriter(conn)
 		if err = writer.Write(handler(value.Array[1:])); err != nil {
 			fmt.Println("Error while writing the message:", err)
 			continue
 		}
 
-		if command == "SET" || command == "REPLCONF" && len(s.slaves) > 0 {
+		if command == "SET" && len(s.slaves) > 0 {
 			s.broadcastch <- value.Marshal()
 		}
 
@@ -155,12 +165,12 @@ func (s *Server) Handle(conn net.Conn) {
 				fmt.Println("Response with RDB file error")
 				break
 			}
+			
+			s.slaves = append(s.slaves, conn)
 
 			// Read the RDB to avoid errors
 			res := make([]byte, 1024)
 			_, _ = conn.Read(res)
-			
-			s.slaves = append(s.slaves, conn)
 		}
 	}
 }
