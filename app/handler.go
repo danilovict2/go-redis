@@ -165,6 +165,8 @@ func replconf(args []resp.Value) resp.Value {
 	switch strings.ToUpper(args[0].Bulk) {
 	case "GETACK":
 		return replconfgetack(args[1:])
+	case "ACK":
+		return resp.Value{}
 	default:
 		return resp.Value{Typ: "string", Str: "OK"}
 	}
@@ -175,8 +177,9 @@ func replconfgetack(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "Invalid GETACK parameter"}
 	}
 
+	offset := strconv.Itoa(server.offset)
 	ret := resp.Value{Typ: "array"}
-	ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: "REPLCONF"}, resp.Value{Typ: "bulk", Bulk: "ACK"}, resp.Value{Typ: "bulk", Bulk: "0"})
+	ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: "REPLCONF"}, resp.Value{Typ: "bulk", Bulk: "ACK"}, resp.Value{Typ: "bulk", Bulk: offset})
 	return ret
 }
 

@@ -25,6 +25,7 @@ type Server struct {
 	slaves      []net.Conn
 	listener    net.Listener
 	broadcastch chan []byte
+	offset      int
 }
 
 var server *Server
@@ -132,24 +133,13 @@ func (s *Server) Handle(conn net.Conn) {
 			break
 		}
 
-		if (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") {
-			fmt.Println(s.slaves)
-			for _, server := range s.slaves {
-				comm := "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n"
-				server.Write([]byte(comm))
-				res := make([]byte, 1024)
-				server.Read(res)
-				fmt.Println(string(res))
-			}
-		}
-
 		writer := NewWriter(conn)
 		if err = writer.Write(handler(value.Array[1:])); err != nil {
 			fmt.Println("Error while writing the message:", err)
 			continue
 		}
 
-		if command == "SET" && len(s.slaves) > 0 {
+		if command == "SET" || (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") && len(s.slaves) > 0 {
 			s.broadcastch <- value.Marshal()
 		}
 
@@ -165,12 +155,8 @@ func (s *Server) Handle(conn net.Conn) {
 				fmt.Println("Response with RDB file error")
 				break
 			}
-			
-			s.slaves = append(s.slaves, conn)
 
-			// Read the RDB to avoid errors
-			res := make([]byte, 1024)
-			_, _ = conn.Read(res)
+			s.slaves = append(s.slaves, conn)
 		}
 	}
 }
@@ -294,12 +280,60 @@ func (s *Server) connectToMaster() {
 		fmt.Println("Error while reading response 3/3")
 		os.Exit(1)
 	}
-	s.Handle(conn)
+
+	// Read the RDB (ignore it for now)
+	_, _ = conn.Read(res)
+	s.HandleMaster(conn)
+}
+
+func (s *Server) HandleMaster(masterConn net.Conn) {
+	defer masterConn.Close()
+	resp := NewResp(masterConn)
+
+	for {
+		value, err := resp.Read()
+		s.offset += len(value.Marshal())
+
+		if errors.Is(err, io.EOF) {
+			fmt.Println("Client closed the connections:", masterConn.RemoteAddr())
+			break
+		} else if err != nil {
+			fmt.Println("Error while reading the message:", err)
+			break
+		}
+
+		if value.Typ != "array" {
+			fmt.Println("Invalid request, expected array")
+			continue
+		}
+
+		if len(value.Array) < 1 {
+			fmt.Println("Invalid request, expected array length > 0")
+			continue
+		}
+
+		command := strings.ToUpper(value.Array[0].Bulk)
+		handler, ok := Handlers[command]
+		if !ok {
+			fmt.Println("Invalid command: ", command)
+			break
+		}
+
+		if command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK" {
+			writer := NewWriter(masterConn)
+			if err = writer.Write(handler(value.Array[1:])); err != nil {
+				fmt.Println("Error while writing the message:", err)
+				continue
+			}
+		}
+	}
 }
 
 func (s *Server) propagateLoop() {
 	for {
 		msg := <-s.broadcastch
+		s.offset += len(msg)
+
 		for _, server := range s.slaves {
 			_, err := server.Write(msg)
 			if err != nil {
