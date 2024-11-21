@@ -226,9 +226,11 @@ func xadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xadd' command"}
 	}
 
-	
-	if isLessThanOrEqual(args[1].Bulk, lastStreamID) {
-		if isLessThanOrEqual(args[1].Bulk, "0-0") {
+	newStreamID := tryGenarateStreamId(args[1].Bulk)
+	fmt.Println(newStreamID)
+
+	if isLessThanOrEqual(newStreamID, lastStreamID) {
+		if isLessThanOrEqual(newStreamID, "0-0") {
 			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD must be greater than 0-0"}
 		} else {
 			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD is equal or smaller than the target stream top item"}
@@ -237,7 +239,7 @@ func xadd(args []resp.Value) resp.Value {
 
 	streamKey := args[0].Bulk
 	stream := Stream{
-		id:   args[1].Bulk,
+		id:   newStreamID,
 		KVPs: make(map[string]string),
 	}
 
@@ -251,6 +253,37 @@ func xadd(args []resp.Value) resp.Value {
 
 	lastStreamID = stream.id
 	return resp.Value{Typ: "bulk", Bulk: stream.id}
+}
+
+func tryGenarateStreamId(input string) string {
+	inputSplit := strings.Split(input, "-")
+	if len(inputSplit) == 2 && inputSplit[1] != "*" {
+		return input
+	}
+
+	STREAMsMu.RLock()
+	streams := STREAMs
+	STREAMsMu.RUnlock()
+
+	var sequence int64 = -1
+	for _, stream := range streams {
+		streamIDSplit := strings.Split(stream.id, "-")
+		seq, err := strconv.ParseInt(streamIDSplit[1], 10, 64)
+
+		if err != nil {
+			return input
+		}
+
+		if streamIDSplit[0] == inputSplit[0] && seq > sequence {
+			sequence = seq
+		}
+	}
+
+	if inputSplit[0] == "0" && sequence == -1 {
+		sequence = 0
+	}
+
+	return inputSplit[0] + "-" + strconv.FormatInt(sequence + 1, 10)
 }
 
 func isLessThanOrEqual(id1, id2 string) bool {
