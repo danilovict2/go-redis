@@ -20,6 +20,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"INFO":     info,
 	"REPLCONF": replconf,
 	"PSYNC":    psync,
+	"TYPE":     typ,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -185,4 +186,21 @@ func replconfgetack(args []resp.Value) resp.Value {
 
 func psync(args []resp.Value) resp.Value {
 	return resp.Value{Typ: "string", Str: "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"}
+}
+
+func typ(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'type' command"}
+	}
+
+	key := args[0].Bulk
+	SETsMu.RLock()
+	_, ok := SETs[key]
+	SETsMu.RUnlock()
+
+	if !ok {
+		return resp.Value{Typ: "string", Str: "none"}
+	}
+
+	return resp.Value{Typ: "string", Str: "string"}
 }
