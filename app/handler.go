@@ -21,6 +21,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"REPLCONF": replconf,
 	"PSYNC":    psync,
 	"TYPE":     typ,
+	"XADD":     xadd,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -195,12 +196,48 @@ func typ(args []resp.Value) resp.Value {
 
 	key := args[0].Bulk
 	SETsMu.RLock()
-	_, ok := SETs[key]
+	_, isString := SETs[key]
 	SETsMu.RUnlock()
 
-	if !ok {
-		return resp.Value{Typ: "string", Str: "none"}
+	STREAMsMu.RLock()
+	_, isStream := STREAMs[key]
+	STREAMsMu.RUnlock()
+
+	if isString {
+		return resp.Value{Typ: "string", Str: "string"}
+	} else if isStream {
+		return resp.Value{Typ: "string", Str: "stream"}
 	}
 
-	return resp.Value{Typ: "string", Str: "string"}
+	return resp.Value{Typ: "string", Str: "none"}
+}
+
+type Stream struct {
+	id   string
+	KVPs map[string]string
+}
+
+var STREAMs = map[string]Stream{}
+var STREAMsMu = sync.RWMutex{}
+
+func xadd(args []resp.Value) resp.Value {
+	if len(args) < 4 || len(args)%2 != 0 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xadd' command"}
+	}
+
+	streamKey := args[0].Bulk
+	stream := Stream{
+		id:   args[1].Bulk,
+		KVPs: make(map[string]string),
+	}
+
+	for i := 2; i < len(args); i += 2 {
+		stream.KVPs[args[i].Bulk] = args[i+1].Bulk
+	}
+
+	STREAMsMu.Lock()
+	STREAMs[streamKey] = stream
+	STREAMsMu.Unlock()
+
+	return resp.Value{Typ: "bulk", Bulk: stream.id}
 }
