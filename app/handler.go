@@ -227,8 +227,7 @@ func xadd(args []resp.Value) resp.Value {
 	}
 
 	newStreamID := tryGenarateStreamId(args[1].Bulk)
-	fmt.Println(newStreamID)
-
+	
 	if isLessThanOrEqual(newStreamID, lastStreamID) {
 		if isLessThanOrEqual(newStreamID, "0-0") {
 			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD must be greater than 0-0"}
@@ -259,6 +258,10 @@ func tryGenarateStreamId(input string) string {
 	inputSplit := strings.Split(input, "-")
 	if len(inputSplit) == 2 && inputSplit[1] != "*" {
 		return input
+	}
+
+	if inputSplit[0] == "*" {
+		inputSplit[0] = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	}
 
 	STREAMsMu.RLock()
