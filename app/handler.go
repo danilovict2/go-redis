@@ -219,10 +219,20 @@ type Stream struct {
 
 var STREAMs = map[string]Stream{}
 var STREAMsMu = sync.RWMutex{}
+var lastStreamID string = "0-0"
 
 func xadd(args []resp.Value) resp.Value {
 	if len(args) < 4 || len(args)%2 != 0 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xadd' command"}
+	}
+
+	
+	if isLessThanOrEqual(args[1].Bulk, lastStreamID) {
+		if isLessThanOrEqual(args[1].Bulk, "0-0") {
+			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD must be greater than 0-0"}
+		} else {
+			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD is equal or smaller than the target stream top item"}
+		}
 	}
 
 	streamKey := args[0].Bulk
@@ -239,5 +249,28 @@ func xadd(args []resp.Value) resp.Value {
 	STREAMs[streamKey] = stream
 	STREAMsMu.Unlock()
 
+	lastStreamID = stream.id
 	return resp.Value{Typ: "bulk", Bulk: stream.id}
+}
+
+func isLessThanOrEqual(id1, id2 string) bool {
+	ID1Split := strings.Split(id1, "-")
+	ID2Split := strings.Split(id2, "-")
+	
+	if len(ID1Split) != 2 || len(ID2Split) != 2 {
+		// Invalid Redis ID format
+		return false
+	}
+	
+	timestamp1, err1 := strconv.ParseInt(ID1Split[0], 10, 64)
+	timestamp2, err2 := strconv.ParseInt(ID2Split[0], 10, 64)
+	sequence1, err3 := strconv.ParseInt(ID1Split[1], 10, 64)
+	sequence2, err4 := strconv.ParseInt(ID2Split[1], 10, 64)
+
+	if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+		return false
+	}
+
+	
+	return timestamp1 < timestamp2 || (timestamp1 == timestamp2 && sequence1 <= sequence2)
 }
