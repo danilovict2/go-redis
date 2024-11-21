@@ -22,6 +22,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"PSYNC":    psync,
 	"TYPE":     typ,
 	"XADD":     xadd,
+	"XRANGE":   xrange,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -213,48 +214,65 @@ func typ(args []resp.Value) resp.Value {
 }
 
 type Stream struct {
+	last    string
+	entries []StreamEntry
+}
+
+type StreamEntry struct {
 	id   string
 	KVPs map[string]string
 }
 
 var STREAMs = map[string]Stream{}
 var STREAMsMu = sync.RWMutex{}
-var lastStreamID string = "0-0"
 
 func xadd(args []resp.Value) resp.Value {
 	if len(args) < 4 || len(args)%2 != 0 {
 		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xadd' command"}
 	}
 
-	newStreamID := tryGenarateStreamId(args[1].Bulk)
-	
-	if isLessThanOrEqual(newStreamID, lastStreamID) {
-		if isLessThanOrEqual(newStreamID, "0-0") {
+	streamKey := args[0].Bulk
+	STREAMsMu.Lock()
+	stream, ok := STREAMs[streamKey]
+	STREAMsMu.Unlock()
+
+	if !ok {
+		stream = Stream{
+			last:    "0-0",
+			entries: make([]StreamEntry, 0),
+		}
+	}
+
+	newStreamEntryID := tryGenarateStreamEntryId(args[1].Bulk, stream)
+
+	if isLessThanOrEqual(newStreamEntryID, stream.last) {
+		if isLessThanOrEqual(newStreamEntryID, "0-0") {
 			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD must be greater than 0-0"}
 		} else {
 			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD is equal or smaller than the target stream top item"}
 		}
 	}
 
-	streamKey := args[0].Bulk
-	stream := Stream{
-		id:   newStreamID,
+	entry := StreamEntry{
+		id:   newStreamEntryID,
 		KVPs: make(map[string]string),
 	}
 
 	for i := 2; i < len(args); i += 2 {
-		stream.KVPs[args[i].Bulk] = args[i+1].Bulk
+		entry.KVPs[args[i].Bulk] = args[i+1].Bulk
 	}
+
+	stream.entries = append(stream.entries, entry)
+	stream.last = newStreamEntryID
 
 	STREAMsMu.Lock()
 	STREAMs[streamKey] = stream
 	STREAMsMu.Unlock()
 
-	lastStreamID = stream.id
-	return resp.Value{Typ: "bulk", Bulk: stream.id}
+	return resp.Value{Typ: "bulk", Bulk: entry.id}
 }
 
-func tryGenarateStreamId(input string) string {
+func tryGenarateStreamEntryId(input string, stream Stream) string {
 	inputSplit := strings.Split(input, "-")
 	if len(inputSplit) == 2 && inputSplit[1] != "*" {
 		return input
@@ -264,40 +282,30 @@ func tryGenarateStreamId(input string) string {
 		inputSplit[0] = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	}
 
-	STREAMsMu.RLock()
-	streams := STREAMs
-	STREAMsMu.RUnlock()
+	var sequence int64 = 0
+	streamIDSplit := strings.Split(stream.last, "-")
 
-	var sequence int64 = -1
-	for _, stream := range streams {
-		streamIDSplit := strings.Split(stream.id, "-")
-		seq, err := strconv.ParseInt(streamIDSplit[1], 10, 64)
-
-		if err != nil {
-			return input
-		}
-
-		if streamIDSplit[0] == inputSplit[0] && seq > sequence {
-			sequence = seq
-		}
+	lastSeq, err := strconv.ParseInt(streamIDSplit[1], 10, 64)
+	if err != nil {
+		return input
 	}
 
-	if inputSplit[0] == "0" && sequence == -1 {
-		sequence = 0
+	if streamIDSplit[0] == inputSplit[0] {
+		sequence = lastSeq + 1
 	}
 
-	return inputSplit[0] + "-" + strconv.FormatInt(sequence + 1, 10)
+	return inputSplit[0] + "-" + strconv.FormatInt(sequence, 10)
 }
 
 func isLessThanOrEqual(id1, id2 string) bool {
 	ID1Split := strings.Split(id1, "-")
 	ID2Split := strings.Split(id2, "-")
-	
+
 	if len(ID1Split) != 2 || len(ID2Split) != 2 {
 		// Invalid Redis ID format
 		return false
 	}
-	
+
 	timestamp1, err1 := strconv.ParseInt(ID1Split[0], 10, 64)
 	timestamp2, err2 := strconv.ParseInt(ID2Split[0], 10, 64)
 	sequence1, err3 := strconv.ParseInt(ID1Split[1], 10, 64)
@@ -307,6 +315,54 @@ func isLessThanOrEqual(id1, id2 string) bool {
 		return false
 	}
 
-	
 	return timestamp1 < timestamp2 || (timestamp1 == timestamp2 && sequence1 <= sequence2)
+}
+
+func xrange(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xrange' command"}
+	}
+
+	ret := resp.Value{Typ: "array"}
+	streamKey := args[0].Bulk
+	STREAMsMu.RLock()
+	stream, ok := STREAMs[streamKey]
+	STREAMsMu.RUnlock()
+
+	if !ok {
+		return ret
+	}
+
+	start := strings.Split(args[1].Bulk, "-")
+	end := strings.Split(args[2].Bulk, "-")
+	
+	startVal := start[0]
+	var startSeq int64
+	if len(start) == 2 {
+		startSeq, _ = strconv.ParseInt(start[1], 10, 64)
+	}
+
+	endVal := end[0]
+	var endSeq int64
+	if len(end) == 2 {
+		endSeq, _ = strconv.ParseInt(end[1], 10, 64)
+	}
+	
+	for _, entry := range stream.entries {
+		entryId := strings.Split(entry.id, "-")
+		val, _ := strconv.ParseInt(entryId[1], 10, 64)
+
+		if (entryId[0] > startVal || (entryId[0] == startVal && val >= startSeq)) && (entryId[0] < endVal || (entryId[0] == endVal && val <= endSeq)) {
+			valsArr := resp.Value{Typ: "array"}
+			for key, value := range entry.KVPs {
+				valsArr.Array = append(valsArr.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
+			}
+
+			respEntry := resp.Value{Typ: "array"}
+			respEntry.Array = append(respEntry.Array, resp.Value{Typ: "bulk", Bulk: entry.id}, valsArr)
+			ret.Array = append(ret.Array, respEntry)
+		}
+	}
+
+	return ret
 }
