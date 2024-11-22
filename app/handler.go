@@ -333,20 +333,8 @@ func xrange(args []resp.Value) resp.Value {
 		return ret
 	}
 
-	start := strings.Split(args[1].Bulk, "-")
-	end := strings.Split(args[2].Bulk, "-")
-	
-	startVal := start[0]
-	var startSeq int64
-	if len(start) == 2 {
-		startSeq, _ = strconv.ParseInt(start[1], 10, 64)
-	}
-
-	endVal := end[0]
-	var endSeq int64
-	if len(end) == 2 {
-		endSeq, _ = strconv.ParseInt(end[1], 10, 64)
-	}
+	startVal, startSeq := xrangeFormatArgs(args[1].Bulk, stream)
+	endVal, endSeq := xrangeFormatArgs(args[2].Bulk, stream)
 	
 	for _, entry := range stream.entries {
 		entryId := strings.Split(entry.id, "-")
@@ -365,4 +353,23 @@ func xrange(args []resp.Value) resp.Value {
 	}
 
 	return ret
+}
+
+func xrangeFormatArgs(arg string, stream Stream) (string, int64) {
+	splitArg := strings.Split(arg, "-")
+	if splitArg[0] == "-" {
+		return "0", 0
+	}
+
+	if splitArg[0] == "+" {
+		splitArg = strings.Split(stream.last, "-")
+	}
+
+	val := splitArg[0]
+	var seq int64
+	if len(splitArg) == 2 {
+		seq, _ = strconv.ParseInt(splitArg[1], 10, 64)
+	}
+
+	return val, seq
 }
