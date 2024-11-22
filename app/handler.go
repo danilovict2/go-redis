@@ -333,7 +333,7 @@ func xrange(args []resp.Value) resp.Value {
 	STREAMsMu.RUnlock()
 
 	if !ok {
-		return ret
+		return resp.Value{Typ: "null"}
 	}
 
 	startVal, startSeq := xrangeFormatArgs(args[1].Bulk, stream)
@@ -353,6 +353,10 @@ func xrange(args []resp.Value) resp.Value {
 			respEntry.Array = append(respEntry.Array, resp.Value{Typ: "bulk", Bulk: entry.id}, valsArr)
 			ret.Array = append(ret.Array, respEntry)
 		}
+	}
+
+	if len(ret.Array) == 0 {
+		return resp.Value{Typ: "null"}
 	}
 
 	return ret
@@ -378,6 +382,13 @@ func xrangeFormatArgs(arg string, stream Stream) (string, int64) {
 }
 
 func xread(args []resp.Value) resp.Value {
+	var blockDuration int = 0
+	if args[0].Bulk == "block" {
+		blockDuration, _ = strconv.Atoi(args[1].Bulk)
+		args = args[2:]
+	}
+
+	time.Sleep(time.Duration(blockDuration) * time.Millisecond)
 	streams := make([]Stream, 0)
 	for _, arg := range args[1:] {
 		STREAMsMu.RLock()
@@ -393,9 +404,10 @@ func xread(args []resp.Value) resp.Value {
 
 	ret := resp.Value{Typ: "array"}
 	if len(streams) == 0 {
-		return ret
+		return resp.Value{Typ: "null"}
 	}
 
+	foundEntry := false
 	for i, stream := range streams {
 		if len(streams)+1+i > len(args) {
 			return resp.Value{Typ: "error", Str: "ERR Unbalanced 'xread' list of streams: for each stream key an ID or '$' must be specified."}
@@ -422,10 +434,15 @@ func xread(args []resp.Value) resp.Value {
 				respEntry.Array = append(respEntry.Array, respKVPs)
 				respEntries.Array = append(respEntries.Array, respEntry)
 				respStream.Array = append(respStream.Array, respEntries)
+				foundEntry = true
 			}
 		}
 
 		ret.Array = append(ret.Array, respStream)
+	}
+	
+	if !foundEntry {
+		return resp.Value{Typ: "null"}
 	}
 
 	return ret
