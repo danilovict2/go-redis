@@ -23,6 +23,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"TYPE":     typ,
 	"XADD":     xadd,
 	"XRANGE":   xrange,
+	"XREAD":    xread,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -335,12 +336,12 @@ func xrange(args []resp.Value) resp.Value {
 
 	startVal, startSeq := xrangeFormatArgs(args[1].Bulk, stream)
 	endVal, endSeq := xrangeFormatArgs(args[2].Bulk, stream)
-	
+
 	for _, entry := range stream.entries {
 		entryId := strings.Split(entry.id, "-")
-		val, _ := strconv.ParseInt(entryId[1], 10, 64)
+		seq, _ := strconv.ParseInt(entryId[1], 10, 64)
 
-		if (entryId[0] > startVal || (entryId[0] == startVal && val >= startSeq)) && (entryId[0] < endVal || (entryId[0] == endVal && val <= endSeq)) {
+		if (entryId[0] > startVal || (entryId[0] == startVal && seq >= startSeq)) && (entryId[0] < endVal || (entryId[0] == endVal && seq <= endSeq)) {
 			valsArr := resp.Value{Typ: "array"}
 			for key, value := range entry.KVPs {
 				valsArr.Array = append(valsArr.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
@@ -372,4 +373,47 @@ func xrangeFormatArgs(arg string, stream Stream) (string, int64) {
 	}
 
 	return val, seq
+}
+
+func xread(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xread' command"}
+	}
+
+	streamKey := args[1].Bulk
+	STREAMsMu.RLock()
+	stream, ok := STREAMs[streamKey]
+	STREAMsMu.RUnlock()
+
+	ret := resp.Value{Typ: "array"}
+	if !ok {
+		return ret
+	}
+
+	startVal, startSeq := xrangeFormatArgs(args[2].Bulk, stream)
+	respStream := resp.Value{Typ: "array"}
+	respStream.Array = append(respStream.Array, resp.Value{Typ: "bulk", Bulk: streamKey})
+
+	for _, entry := range stream.entries {
+		entryId := strings.Split(entry.id, "-")
+		seq, _ := strconv.ParseInt(entryId[1], 10, 64)
+
+		if (entryId[0] > startVal || (entryId[0] == startVal && seq > startSeq)) {
+			respEntries := resp.Value{Typ: "array"}
+			respEntry := resp.Value{Typ: "array"}
+			respEntry.Array = append(respEntry.Array, resp.Value{Typ: "bulk", Bulk: entry.id}) 
+
+			respKVPs := resp.Value{Typ: "array"}
+			for key, value := range entry.KVPs {
+				respKVPs.Array = append(respKVPs.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
+			}
+
+			respEntry.Array = append(respEntry.Array, respKVPs)
+			respEntries.Array = append(respEntries.Array, respEntry)
+			respStream.Array = append(respStream.Array, respEntries)
+		}
+	}
+
+	ret.Array = append(ret.Array, respStream)
+	return ret
 }
