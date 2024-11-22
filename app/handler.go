@@ -222,7 +222,6 @@ type Streams struct {
 }
 
 type Stream struct {
-	key     string
 	last    string
 	entries []StreamEntry
 }
@@ -233,9 +232,9 @@ type StreamEntry struct {
 }
 
 var streams Streams = Streams{
-	entries: make(map[string]Stream),
-	mu:      sync.RWMutex{},
-	change:  make(chan struct{}),
+	entries:     make(map[string]Stream),
+	mu:          sync.RWMutex{},
+	change:      make(chan struct{}),
 	trackChange: false,
 }
 
@@ -251,7 +250,6 @@ func xadd(args []resp.Value) resp.Value {
 
 	if !ok {
 		stream = Stream{
-			key:     streamKey,
 			last:    "0-0",
 			entries: make([]StreamEntry, 0),
 		}
@@ -397,10 +395,28 @@ func xrangeFormatArgs(arg string, stream Stream) (string, int64) {
 }
 
 func xread(args []resp.Value) resp.Value {
+	searchData := args[1:]
 	var blockDuration int = -1
 	if args[0].Bulk == "block" {
 		blockDuration, _ = strconv.Atoi(args[1].Bulk)
-		args = args[2:]
+		searchData = args[3:]
+	}
+
+	median := len(searchData) / 2
+	streamKeys := make([]string, 0)
+
+	for i := 0; i+median < len(searchData); i++ {
+		streamKeys = append(streamKeys, searchData[i].Bulk)
+		if searchData[i+median].Bulk == "$" {
+			streams.mu.RLock()
+			stream, ok := streams.entries[searchData[i].Bulk]
+			streams.mu.RUnlock()
+			if ok {
+				searchData[median+i].Bulk = stream.last
+			} else {
+				searchData[median+i].Bulk = "0-0"
+			}
+		}
 	}
 
 	if blockDuration == 0 {
@@ -410,33 +426,28 @@ func xread(args []resp.Value) resp.Value {
 	}
 
 	time.Sleep(time.Duration(blockDuration) * time.Millisecond)
-	streamsToRead := make([]Stream, 0)
-	for _, arg := range args[1:] {
-		streams.mu.RLock()
-		stream, ok := streams.entries[arg.Bulk]
-		streams.mu.RUnlock()
-
-		if !ok {
-			break
-		}
-
-		streamsToRead = append(streamsToRead, stream)
-	}
 
 	ret := resp.Value{Typ: "array"}
-	if len(streamsToRead) == 0 {
+	if len(streamKeys) == 0 {
 		return resp.Value{Typ: "null"}
 	}
 
 	foundEntry := false
-	for i, stream := range streamsToRead {
-		if len(streamsToRead)+1+i > len(args) {
+	for i, streamKey := range streamKeys {
+		if median+i >= len(searchData) {
 			return resp.Value{Typ: "error", Str: "ERR Unbalanced 'xread' list of streams: for each stream key an ID or '$' must be specified."}
 		}
 
-		startVal, startSeq := xrangeFormatArgs(args[len(streamsToRead)+1+i].Bulk, stream)
+		streams.mu.RLock()
+		stream, ok := streams.entries[streamKey]
+		streams.mu.RUnlock()
+		if !ok {
+			continue
+		}
+
+		startVal, startSeq := xrangeFormatArgs(searchData[median+i].Bulk, stream)
 		respStream := resp.Value{Typ: "array"}
-		respStream.Array = append(respStream.Array, resp.Value{Typ: "bulk", Bulk: stream.key})
+		respStream.Array = append(respStream.Array, resp.Value{Typ: "bulk", Bulk: streamKey})
 
 		for _, entry := range stream.entries {
 			entryId := strings.Split(entry.id, "-")
