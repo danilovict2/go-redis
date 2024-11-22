@@ -201,9 +201,9 @@ func typ(args []resp.Value) resp.Value {
 	_, isString := SETs[key]
 	SETsMu.RUnlock()
 
-	STREAMsMu.RLock()
-	_, isStream := STREAMs[key]
-	STREAMsMu.RUnlock()
+	streams.mu.RLock()
+	_, isStream := streams.entries[key]
+	streams.mu.RUnlock()
 
 	if isString {
 		return resp.Value{Typ: "string", Str: "string"}
@@ -212,6 +212,13 @@ func typ(args []resp.Value) resp.Value {
 	}
 
 	return resp.Value{Typ: "string", Str: "none"}
+}
+
+type Streams struct {
+	entries     map[string]Stream
+	mu          sync.RWMutex
+	change      chan struct{}
+	trackChange bool
 }
 
 type Stream struct {
@@ -225,8 +232,12 @@ type StreamEntry struct {
 	KVPs map[string]string
 }
 
-var STREAMs = map[string]Stream{}
-var STREAMsMu = sync.RWMutex{}
+var streams Streams = Streams{
+	entries: make(map[string]Stream),
+	mu:      sync.RWMutex{},
+	change:  make(chan struct{}),
+	trackChange: false,
+}
 
 func xadd(args []resp.Value) resp.Value {
 	if len(args) < 4 || len(args)%2 != 0 {
@@ -234,9 +245,9 @@ func xadd(args []resp.Value) resp.Value {
 	}
 
 	streamKey := args[0].Bulk
-	STREAMsMu.Lock()
-	stream, ok := STREAMs[streamKey]
-	STREAMsMu.Unlock()
+	streams.mu.RLock()
+	stream, ok := streams.entries[streamKey]
+	streams.mu.RUnlock()
 
 	if !ok {
 		stream = Stream{
@@ -268,9 +279,13 @@ func xadd(args []resp.Value) resp.Value {
 	stream.entries = append(stream.entries, entry)
 	stream.last = newStreamEntryID
 
-	STREAMsMu.Lock()
-	STREAMs[streamKey] = stream
-	STREAMsMu.Unlock()
+	streams.mu.Lock()
+	streams.entries[streamKey] = stream
+	streams.mu.Unlock()
+
+	if streams.trackChange {
+		streams.change <- struct{}{}
+	}
 
 	return resp.Value{Typ: "bulk", Bulk: entry.id}
 }
@@ -328,9 +343,9 @@ func xrange(args []resp.Value) resp.Value {
 
 	ret := resp.Value{Typ: "array"}
 	streamKey := args[0].Bulk
-	STREAMsMu.RLock()
-	stream, ok := STREAMs[streamKey]
-	STREAMsMu.RUnlock()
+	streams.mu.RLock()
+	stream, ok := streams.entries[streamKey]
+	streams.mu.RUnlock()
 
 	if !ok {
 		return resp.Value{Typ: "null"}
@@ -382,38 +397,44 @@ func xrangeFormatArgs(arg string, stream Stream) (string, int64) {
 }
 
 func xread(args []resp.Value) resp.Value {
-	var blockDuration int = 0
+	var blockDuration int = -1
 	if args[0].Bulk == "block" {
 		blockDuration, _ = strconv.Atoi(args[1].Bulk)
 		args = args[2:]
 	}
 
+	if blockDuration == 0 {
+		streams.trackChange = true
+		<-streams.change
+		streams.trackChange = false
+	}
+
 	time.Sleep(time.Duration(blockDuration) * time.Millisecond)
-	streams := make([]Stream, 0)
+	streamsToRead := make([]Stream, 0)
 	for _, arg := range args[1:] {
-		STREAMsMu.RLock()
-		stream, ok := STREAMs[arg.Bulk]
-		STREAMsMu.RUnlock()
+		streams.mu.RLock()
+		stream, ok := streams.entries[arg.Bulk]
+		streams.mu.RUnlock()
 
 		if !ok {
 			break
 		}
 
-		streams = append(streams, stream)
+		streamsToRead = append(streamsToRead, stream)
 	}
 
 	ret := resp.Value{Typ: "array"}
-	if len(streams) == 0 {
+	if len(streamsToRead) == 0 {
 		return resp.Value{Typ: "null"}
 	}
 
 	foundEntry := false
-	for i, stream := range streams {
-		if len(streams)+1+i > len(args) {
+	for i, stream := range streamsToRead {
+		if len(streamsToRead)+1+i > len(args) {
 			return resp.Value{Typ: "error", Str: "ERR Unbalanced 'xread' list of streams: for each stream key an ID or '$' must be specified."}
 		}
 
-		startVal, startSeq := xrangeFormatArgs(args[len(streams)+1+i].Bulk, stream)
+		startVal, startSeq := xrangeFormatArgs(args[len(streamsToRead)+1+i].Bulk, stream)
 		respStream := resp.Value{Typ: "array"}
 		respStream.Array = append(respStream.Array, resp.Value{Typ: "bulk", Bulk: stream.key})
 
@@ -440,7 +461,7 @@ func xread(args []resp.Value) resp.Value {
 
 		ret.Array = append(ret.Array, respStream)
 	}
-	
+
 	if !foundEntry {
 		return resp.Value{Typ: "null"}
 	}
