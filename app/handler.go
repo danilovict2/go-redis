@@ -26,6 +26,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"XREAD":    xread,
 	"INCR":     incr,
 	"MULTI":    multi,
+	"EXEC":     exec,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -515,4 +516,16 @@ func multi(args []resp.Value) resp.Value {
 
 	server.queueCommands = true
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
+
+func exec(args []resp.Value) resp.Value {
+	if len(args) != 0 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'exec' command"}
+	}
+
+	if !server.queueCommands {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR EXEC without MULTI"}
+	}
+
+	return resp.Value{}
 }
