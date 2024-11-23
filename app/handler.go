@@ -517,6 +517,13 @@ func exec(queue *Queue) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR EXEC without MULTI"}
 	}
 
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
+	for _, item := range queue.items {
+		command := strings.ToUpper(item.Array[0].Bulk)
+		handler := Handlers[command]
+		ret.Array = append(ret.Array, ExecuteCommand(handler, item.Array[1:]))
+	}
+
 	queue.active = false
-	return resp.Value{Typ: resp.ARRAY_TYPE}
+	return ret
 }

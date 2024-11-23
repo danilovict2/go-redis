@@ -20,12 +20,12 @@ type ReplicaConfig struct {
 }
 
 type Server struct {
-	configs       map[string]string
-	replconf      ReplicaConfig
-	slaves        []net.Conn
-	listener      net.Listener
-	broadcastch   chan []byte
-	offset        int
+	configs     map[string]string
+	replconf    ReplicaConfig
+	slaves      []net.Conn
+	listener    net.Listener
+	broadcastch chan []byte
+	offset      int
 }
 
 var server *Server
@@ -115,7 +115,6 @@ func (s *Server) Handle(conn net.Conn) {
 
 	for {
 		value, err := res.Read()
-		fmt.Println(value)
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", conn.RemoteAddr())
 			break
@@ -147,19 +146,20 @@ func (s *Server) Handle(conn net.Conn) {
 		case "EXEC":
 			writer.Write(exec(&queue))
 		default:
+			handler, ok := Handlers[command]
+			if !ok {
+				fmt.Println("Invalid command: ", command)
+				writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: fmt.Sprintf("ERR unknown command %v", command)})
+				continue
+			}
+
 			if queue.active {
 				queue.items = append(queue.items, value)
 				writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "QUEUED"})
 				continue
 			}
 
-			handler, ok := Handlers[command]
-			if !ok {
-				fmt.Println("Invalid command: ", command)
-				return
-			}
-
-			if err = writer.Write(handler(value.Array[1:])); err != nil {
+			if err = writer.Write(ExecuteCommand(handler, value.Array[1:])); err != nil {
 				fmt.Println("Error while writing the message:", err)
 				continue
 			}
@@ -185,6 +185,10 @@ func (s *Server) Handle(conn net.Conn) {
 			s.slaves = append(s.slaves, conn)
 		}
 	}
+}
+
+func ExecuteCommand(execute func([]resp.Value) resp.Value, args []resp.Value) resp.Value {
+	return execute(args)
 }
 
 func (s *Server) connectToMaster() {
