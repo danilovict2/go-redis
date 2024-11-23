@@ -488,15 +488,21 @@ func incr(args []resp.Value) resp.Value {
 
 	key := args[0].Bulk
 	SETsMu.RLock()
-	val := SETs[key]
+	val, ok := SETs[key]
 	SETsMu.RUnlock()
 
-	i, _ := strconv.Atoi(val)
-	i++
+	if !ok {
+		val = "0"
+	}
+
+	i, err := strconv.Atoi(val)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR value is not an integer or out of range"}
+	}
 
 	SETsMu.Lock()
-	SETs[key] = strconv.Itoa(i)
+	SETs[key] = strconv.Itoa(i+1)
 	SETsMu.Unlock()
 
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i)}
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i+1)}
 }
