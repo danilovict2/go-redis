@@ -20,12 +20,14 @@ type ReplicaConfig struct {
 }
 
 type Server struct {
-	configs     map[string]string
-	replconf    ReplicaConfig
-	slaves      []net.Conn
-	listener    net.Listener
-	broadcastch chan []byte
-	offset      int
+	configs       map[string]string
+	replconf      ReplicaConfig
+	slaves        []net.Conn
+	listener      net.Listener
+	broadcastch   chan []byte
+	offset        int
+	queueCommands bool
+	queue         []resp.Value
 }
 
 var server *Server
@@ -105,9 +107,9 @@ func (s *Server) Accept() {
 
 func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
-	resp := NewResp(conn)
+	res := NewResp(conn)
 	for {
-		value, err := resp.Read()
+		value, err := res.Read()
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", conn.RemoteAddr())
 			break
@@ -123,6 +125,13 @@ func (s *Server) Handle(conn net.Conn) {
 
 		if len(value.Array) < 1 {
 			fmt.Println("Invalid request, expected array length > 0")
+			continue
+		}
+
+		if server.queueCommands {
+			server.queue = append(server.queue, value)
+			writer := NewWriter(conn)
+			writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "QUEUED"})
 			continue
 		}
 

@@ -25,6 +25,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"XRANGE":   xrange,
 	"XREAD":    xread,
 	"INCR":     incr,
+	"MULTI":    multi,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -501,8 +502,17 @@ func incr(args []resp.Value) resp.Value {
 	}
 
 	SETsMu.Lock()
-	SETs[key] = strconv.Itoa(i+1)
+	SETs[key] = strconv.Itoa(i + 1)
 	SETsMu.Unlock()
 
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i+1)}
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i + 1)}
+}
+
+func multi(args []resp.Value) resp.Value {
+	if len(args) != 0 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'multi' command"}
+	}
+
+	server.queueCommands = true
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
