@@ -24,6 +24,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"XADD":     xadd,
 	"XRANGE":   xrange,
 	"XREAD":    xread,
+	"INCR":     incr,
 }
 
 func ping(args []resp.Value) resp.Value {
@@ -478,4 +479,24 @@ func xread(args []resp.Value) resp.Value {
 	}
 
 	return ret
+}
+
+func incr(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'incr' command"}
+	}
+
+	key := args[0].Bulk
+	SETsMu.RLock()
+	val := SETs[key]
+	SETsMu.RUnlock()
+
+	i, _ := strconv.Atoi(val)
+	i++
+
+	SETsMu.Lock()
+	SETs[key] = strconv.Itoa(i)
+	SETsMu.Unlock()
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i)}
 }

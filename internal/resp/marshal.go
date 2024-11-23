@@ -17,6 +17,8 @@ func (v Value) Marshal() []byte {
 		return v.marshalError()
 	case NULL_TYPE:
 		return v.marshalNull()
+	case INTEGER_TYPE:
+		return v.marshalInt()
 	default:
 		fmt.Printf("Unknown type: %v", v.Typ)
 		return []byte{}
@@ -25,7 +27,7 @@ func (v Value) Marshal() []byte {
 
 func (v Value) marshalString() []byte {
 	bytes := make([]byte, 0)
-	bytes = append(bytes, '+')
+	bytes = append(bytes, STRING)
 	bytes = append(bytes, v.Str...)
 	bytes = append(bytes, '\r', '\n')
 	return bytes
@@ -34,7 +36,7 @@ func (v Value) marshalString() []byte {
 func (v Value) marshalBulk() []byte {
 	bytes := make([]byte, 0)
 	len := len(v.Bulk)
-	bytes = append(bytes, '$')
+	bytes = append(bytes, BULK)
 	bytes = append(bytes, strconv.Itoa(len)...)
 	bytes = append(bytes, '\r', '\n')
 	bytes = append(bytes, v.Bulk...)
@@ -45,7 +47,7 @@ func (v Value) marshalBulk() []byte {
 func (v Value) marshalArray() []byte {
 	bytes := make([]byte, 0)
 	len := len(v.Array)
-	bytes = append(bytes, '*')
+	bytes = append(bytes, ARRAY)
 	bytes = append(bytes, strconv.Itoa(len)...)
 	bytes = append(bytes, '\r', '\n')
 
@@ -66,4 +68,12 @@ func (v Value) marshalError() []byte {
 
 func (v Value) marshalNull() []byte {
 	return []byte("$-1\r\n")
+}
+
+func (v Value) marshalInt() []byte {
+	bytes := make([]byte, 0)
+	bytes = append(bytes, INTEGER)
+	bytes = append(bytes, v.Int...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
 }
