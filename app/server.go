@@ -26,8 +26,6 @@ type Server struct {
 	listener      net.Listener
 	broadcastch   chan []byte
 	offset        int
-	queueCommands bool
-	queue         []resp.Value
 }
 
 var server *Server
@@ -105,11 +103,19 @@ func (s *Server) Accept() {
 	}
 }
 
+type Queue struct {
+	active bool
+	items  []resp.Value
+}
+
 func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
 	res := NewResp(conn)
+	queue := Queue{active: false, items: make([]resp.Value, 0)}
+
 	for {
 		value, err := res.Read()
+		fmt.Println(value)
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", conn.RemoteAddr())
 			break
@@ -129,24 +135,34 @@ func (s *Server) Handle(conn net.Conn) {
 		}
 
 		command := strings.ToUpper(value.Array[0].Bulk)
-
-		if server.queueCommands && command != "EXEC" {
-			server.queue = append(server.queue, value)
-			writer := NewWriter(conn)
-			writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "QUEUED"})
-			continue
-		}
-
-		handler, ok := Handlers[command]
-		if !ok {
-			fmt.Println("Invalid command: ", command)
-			break
-		}
-
 		writer := NewWriter(conn)
-		if err = writer.Write(handler(value.Array[1:])); err != nil {
-			fmt.Println("Error while writing the message:", err)
-			continue
+
+		switch command {
+		case "MULTI":
+			if queue.active {
+				writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR MULTI calls can not be nested"})
+				continue
+			}
+			writer.Write(multi(&queue))
+		case "EXEC":
+			writer.Write(exec(&queue))
+		default:
+			if queue.active {
+				queue.items = append(queue.items, value)
+				writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "QUEUED"})
+				continue
+			}
+
+			handler, ok := Handlers[command]
+			if !ok {
+				fmt.Println("Invalid command: ", command)
+				return
+			}
+
+			if err = writer.Write(handler(value.Array[1:])); err != nil {
+				fmt.Println("Error while writing the message:", err)
+				continue
+			}
 		}
 
 		if command == "SET" || (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") && len(s.slaves) > 0 {
