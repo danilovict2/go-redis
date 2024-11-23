@@ -145,6 +145,8 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(multi(&queue))
 		case "EXEC":
 			writer.Write(exec(&queue))
+		case "DISCARD":
+			writer.Write(discard(&queue))
 		default:
 			handler, ok := Handlers[command]
 			if !ok {

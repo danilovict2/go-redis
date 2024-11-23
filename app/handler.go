@@ -527,3 +527,13 @@ func exec(queue *Queue) resp.Value {
 	queue.active = false
 	return ret
 }
+
+func discard(queue *Queue) resp.Value {
+	if !queue.active {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR DISCARD without MULTI"}
+	}
+
+	queue.active = false
+	queue.items = nil
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
