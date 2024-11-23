@@ -8,8 +8,16 @@ type Value struct {
 }
 
 const (
-	BULK = '$'
-	ARRAY = '*'
+	BULK   = '$'
+	ARRAY  = '*'
 	STRING = '+'
-	ERROR = '-'
+	ERROR  = '-'
+)
+
+const (
+	BULK_TYPE   = "bulk"
+	ARRAY_TYPE  = "array"
+	STRING_TYPE = "string"
+	ERROR_TYPE  = "error"
+	NULL_TYPE   = "null"
 )

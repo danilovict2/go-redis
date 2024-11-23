@@ -171,7 +171,7 @@ func (s *Server) connectToMaster() {
 
 	defer conn.Close()
 
-	msg := resp.Value{Typ: "array", Array: []resp.Value{
+	msg := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{
 		{
 			Typ:  "bulk",
 			Bulk: "ping",
@@ -191,7 +191,7 @@ func (s *Server) connectToMaster() {
 	}
 
 	msg = resp.Value{
-		Typ: "array",
+		Typ: resp.ARRAY_TYPE,
 		Array: []resp.Value{
 			{
 				Typ:  "bulk",
@@ -222,7 +222,7 @@ func (s *Server) connectToMaster() {
 	}
 
 	msg = resp.Value{
-		Typ: "array",
+		Typ: resp.ARRAY_TYPE,
 		Array: []resp.Value{
 			{
 				Typ:  "bulk",
@@ -252,7 +252,7 @@ func (s *Server) connectToMaster() {
 	}
 
 	msg = resp.Value{
-		Typ: "array",
+		Typ: resp.ARRAY_TYPE,
 		Array: []resp.Value{
 			{
 				Typ:  "bulk",

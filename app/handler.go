@@ -27,15 +27,15 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 }
 
 func ping(args []resp.Value) resp.Value {
-	return resp.Value{Typ: "string", Str: "PONG"}
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
 }
 
 func echo(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'echo' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of args for 'echo' command"}
 	}
 
-	return resp.Value{Typ: "string", Str: args[0].Bulk}
+	return resp.Value{Typ: resp.STRING_TYPE, Str: args[0].Bulk}
 }
 
 var SETs = map[string]string{}
@@ -43,7 +43,7 @@ var SETsMu = sync.RWMutex{}
 
 func set(args []resp.Value) resp.Value {
 	if len(args) != 2 && len(args) != 4 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'set' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of args for 'set' command"}
 	}
 
 	key := args[0].Bulk
@@ -60,12 +60,12 @@ func set(args []resp.Value) resp.Value {
 		case "PX":
 			unit = time.Millisecond
 		default:
-			return resp.Value{Typ: "error", Str: "ERR syntax error"}
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR syntax error"}
 		}
 
 		i64, err := strconv.ParseInt(args[3].Bulk, 10, 64)
 		if err != nil {
-			return resp.Value{Typ: "error", Str: "value is not an integer or out of range"}
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: "value is not an integer or out of range"}
 		}
 
 		go func() {
@@ -74,7 +74,7 @@ func set(args []resp.Value) resp.Value {
 		}()
 	}
 
-	return resp.Value{Typ: "string", Str: "OK"}
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 
 func unset(key string) {
@@ -85,7 +85,7 @@ func unset(key string) {
 
 func get(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of args for 'get' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of args for 'get' command"}
 	}
 
 	key := args[0].Bulk
@@ -94,21 +94,21 @@ func get(args []resp.Value) resp.Value {
 	SETsMu.RUnlock()
 
 	if !ok {
-		return resp.Value{Typ: "null"}
+		return resp.Value{Typ: resp.NULL_TYPE}
 	}
-	return resp.Value{Typ: "bulk", Bulk: val}
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: val}
 }
 
 func config(args []resp.Value) resp.Value {
 	if len(args) != 2 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'config' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'config' command"}
 	}
 
 	switch args[0].Bulk {
 	case "GET":
 		return configGet(args[1:])
 	default:
-		return resp.Value{Typ: "error", Str: fmt.Sprintf("ERR unknown subcommand '%v'", args[0].Bulk)}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: fmt.Sprintf("ERR unknown subcommand '%v'", args[0].Bulk)}
 	}
 }
 
@@ -116,9 +116,9 @@ func configGet(args []resp.Value) resp.Value {
 	key := args[0].Bulk
 	value, ok := server.configs[key]
 
-	ret := resp.Value{Typ: "array"}
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	if ok {
-		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
+		ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: key}, resp.Value{Typ: resp.BULK_TYPE, Bulk: value})
 	}
 
 	return ret
@@ -126,13 +126,13 @@ func configGet(args []resp.Value) resp.Value {
 
 func keys(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'keys' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'keys' command"}
 	}
 
-	ret := resp.Value{Typ: "array"}
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	SETsMu.RLock()
 	for key := range SETs {
-		ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: key})
+		ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: key})
 	}
 	SETsMu.RUnlock()
 
@@ -141,19 +141,19 @@ func keys(args []resp.Value) resp.Value {
 
 func info(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'info' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'info' command"}
 	}
 
 	switch strings.ToUpper(args[0].Bulk) {
 	case "REPLICATION":
 		return infoReplication()
 	default:
-		return resp.Value{Typ: "bulk"}
+		return resp.Value{Typ: resp.BULK_TYPE}
 	}
 }
 
 func infoReplication() resp.Value {
-	ret := resp.Value{Typ: "bulk"}
+	ret := resp.Value{Typ: resp.BULK_TYPE}
 	replicaof := server.replconf.host
 
 	if replicaof != "" {
@@ -172,28 +172,28 @@ func replconf(args []resp.Value) resp.Value {
 	case "ACK":
 		return resp.Value{}
 	default:
-		return resp.Value{Typ: "string", Str: "OK"}
+		return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 	}
 }
 
 func replconfgetack(args []resp.Value) resp.Value {
 	if args[0].Bulk != "*" {
-		return resp.Value{Typ: "error", Str: "Invalid GETACK parameter"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "Invalid GETACK parameter"}
 	}
 
 	offset := strconv.Itoa(server.offset)
-	ret := resp.Value{Typ: "array"}
-	ret.Array = append(ret.Array, resp.Value{Typ: "bulk", Bulk: "REPLCONF"}, resp.Value{Typ: "bulk", Bulk: "ACK"}, resp.Value{Typ: "bulk", Bulk: offset})
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "REPLCONF"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: "ACK"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: offset})
 	return ret
 }
 
 func psync(args []resp.Value) resp.Value {
-	return resp.Value{Typ: "string", Str: "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"}
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"}
 }
 
 func typ(args []resp.Value) resp.Value {
 	if len(args) != 1 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'type' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'type' command"}
 	}
 
 	key := args[0].Bulk
@@ -206,12 +206,12 @@ func typ(args []resp.Value) resp.Value {
 	streams.mu.RUnlock()
 
 	if isString {
-		return resp.Value{Typ: "string", Str: "string"}
+		return resp.Value{Typ: resp.STRING_TYPE, Str: "string"}
 	} else if isStream {
-		return resp.Value{Typ: "string", Str: "stream"}
+		return resp.Value{Typ: resp.STRING_TYPE, Str: "stream"}
 	}
 
-	return resp.Value{Typ: "string", Str: "none"}
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "none"}
 }
 
 type Streams struct {
@@ -240,7 +240,7 @@ var streams Streams = Streams{
 
 func xadd(args []resp.Value) resp.Value {
 	if len(args) < 4 || len(args)%2 != 0 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xadd' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'xadd' command"}
 	}
 
 	streamKey := args[0].Bulk
@@ -259,9 +259,9 @@ func xadd(args []resp.Value) resp.Value {
 
 	if isLessThanOrEqual(newStreamEntryID, stream.last) {
 		if isLessThanOrEqual(newStreamEntryID, "0-0") {
-			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD must be greater than 0-0"}
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR The ID specified in XADD must be greater than 0-0"}
 		} else {
-			return resp.Value{Typ: "error", Str: "ERR The ID specified in XADD is equal or smaller than the target stream top item"}
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR The ID specified in XADD is equal or smaller than the target stream top item"}
 		}
 	}
 
@@ -285,7 +285,7 @@ func xadd(args []resp.Value) resp.Value {
 		streams.change <- struct{}{}
 	}
 
-	return resp.Value{Typ: "bulk", Bulk: entry.id}
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: entry.id}
 }
 
 func tryGenarateStreamEntryId(input string, stream Stream) string {
@@ -336,17 +336,17 @@ func isLessThanOrEqual(id1, id2 string) bool {
 
 func xrange(args []resp.Value) resp.Value {
 	if len(args) != 3 {
-		return resp.Value{Typ: "error", Str: "ERR wrong number of arguments for 'xrange' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'xrange' command"}
 	}
 
-	ret := resp.Value{Typ: "array"}
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	streamKey := args[0].Bulk
 	streams.mu.RLock()
 	stream, ok := streams.entries[streamKey]
 	streams.mu.RUnlock()
 
 	if !ok {
-		return resp.Value{Typ: "null"}
+		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
 	startVal, startSeq := xrangeFormatArgs(args[1].Bulk, stream)
@@ -357,19 +357,19 @@ func xrange(args []resp.Value) resp.Value {
 		seq, _ := strconv.ParseInt(entryId[1], 10, 64)
 
 		if (entryId[0] > startVal || (entryId[0] == startVal && seq >= startSeq)) && (entryId[0] < endVal || (entryId[0] == endVal && seq <= endSeq)) {
-			valsArr := resp.Value{Typ: "array"}
+			valsArr := resp.Value{Typ: resp.ARRAY_TYPE}
 			for key, value := range entry.KVPs {
-				valsArr.Array = append(valsArr.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
+				valsArr.Array = append(valsArr.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: key}, resp.Value{Typ: resp.BULK_TYPE, Bulk: value})
 			}
 
-			respEntry := resp.Value{Typ: "array"}
-			respEntry.Array = append(respEntry.Array, resp.Value{Typ: "bulk", Bulk: entry.id}, valsArr)
+			respEntry := resp.Value{Typ: resp.ARRAY_TYPE}
+			respEntry.Array = append(respEntry.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: entry.id}, valsArr)
 			ret.Array = append(ret.Array, respEntry)
 		}
 	}
 
 	if len(ret.Array) == 0 {
-		return resp.Value{Typ: "null"}
+		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
 	return ret
@@ -427,15 +427,15 @@ func xread(args []resp.Value) resp.Value {
 
 	time.Sleep(time.Duration(blockDuration) * time.Millisecond)
 
-	ret := resp.Value{Typ: "array"}
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	if len(streamKeys) == 0 {
-		return resp.Value{Typ: "null"}
+		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
 	foundEntry := false
 	for i, streamKey := range streamKeys {
 		if median+i >= len(searchData) {
-			return resp.Value{Typ: "error", Str: "ERR Unbalanced 'xread' list of streams: for each stream key an ID or '$' must be specified."}
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR Unbalanced 'xread' list of streams: for each stream key an ID or '$' must be specified."}
 		}
 
 		streams.mu.RLock()
@@ -446,21 +446,21 @@ func xread(args []resp.Value) resp.Value {
 		}
 
 		startVal, startSeq := xrangeFormatArgs(searchData[median+i].Bulk, stream)
-		respStream := resp.Value{Typ: "array"}
-		respStream.Array = append(respStream.Array, resp.Value{Typ: "bulk", Bulk: streamKey})
+		respStream := resp.Value{Typ: resp.ARRAY_TYPE}
+		respStream.Array = append(respStream.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: streamKey})
 
 		for _, entry := range stream.entries {
 			entryId := strings.Split(entry.id, "-")
 			seq, _ := strconv.ParseInt(entryId[1], 10, 64)
 
 			if entryId[0] > startVal || (entryId[0] == startVal && seq > startSeq) {
-				respEntries := resp.Value{Typ: "array"}
-				respEntry := resp.Value{Typ: "array"}
-				respEntry.Array = append(respEntry.Array, resp.Value{Typ: "bulk", Bulk: entry.id})
+				respEntries := resp.Value{Typ: resp.ARRAY_TYPE}
+				respEntry := resp.Value{Typ: resp.ARRAY_TYPE}
+				respEntry.Array = append(respEntry.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: entry.id})
 
-				respKVPs := resp.Value{Typ: "array"}
+				respKVPs := resp.Value{Typ: resp.ARRAY_TYPE}
 				for key, value := range entry.KVPs {
-					respKVPs.Array = append(respKVPs.Array, resp.Value{Typ: "bulk", Bulk: key}, resp.Value{Typ: "bulk", Bulk: value})
+					respKVPs.Array = append(respKVPs.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: key}, resp.Value{Typ: resp.BULK_TYPE, Bulk: value})
 				}
 
 				respEntry.Array = append(respEntry.Array, respKVPs)
@@ -474,7 +474,7 @@ func xread(args []resp.Value) resp.Value {
 	}
 
 	if !foundEntry {
-		return resp.Value{Typ: "null"}
+		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
 	return ret

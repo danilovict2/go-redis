@@ -7,15 +7,15 @@ import (
 
 func (v Value) Marshal() []byte {
 	switch v.Typ {
-	case "string":
+	case STRING_TYPE:
 		return v.marshalString()
-	case "bulk":
+	case BULK_TYPE:
 		return v.marshalBulk()
-	case "array":
+	case ARRAY_TYPE:
 		return v.marshalArray()
-	case "error":
+	case ERROR_TYPE:
 		return v.marshalError()
-	case "null":
+	case NULL_TYPE:
 		return v.marshalNull()
 	default:
 		fmt.Printf("Unknown type: %v", v.Typ)

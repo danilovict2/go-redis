@@ -81,14 +81,14 @@ func readFile(path string) error {
 		j += vLen + 1
 
 		args := make([]resp.Value, 2)
-		args[0] = resp.Value{Typ: "bulk", Bulk: string(key)}
-		args[1] = resp.Value{Typ: "bulk", Bulk: string(value)}
+		args[0] = resp.Value{Typ: resp.BULK_TYPE, Bulk: string(key)}
+		args[1] = resp.Value{Typ: resp.BULK_TYPE, Bulk: string(value)}
 
 		switch expiry.Option {
 		case opCodeEXPIRETIMEMS:
-			args = append(args, resp.Value{Typ: "bulk", Bulk: "PX"}, resp.Value{Typ: "bulk", Bulk: expiry.UntilExpiry})
+			args = append(args, resp.Value{Typ: resp.BULK_TYPE, Bulk: "PX"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: expiry.UntilExpiry})
 		case opCodeEXPIRETIME:
-			args = append(args, resp.Value{Typ: "bulk", Bulk: "EX"}, resp.Value{Typ: "bulk", Bulk: expiry.UntilExpiry})
+			args = append(args, resp.Value{Typ: resp.BULK_TYPE, Bulk: "EX"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: expiry.UntilExpiry})
 		}
 
 		set(args)
