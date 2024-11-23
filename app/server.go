@@ -128,14 +128,15 @@ func (s *Server) Handle(conn net.Conn) {
 			continue
 		}
 
-		if server.queueCommands {
+		command := strings.ToUpper(value.Array[0].Bulk)
+
+		if server.queueCommands && command != "EXEC" {
 			server.queue = append(server.queue, value)
 			writer := NewWriter(conn)
 			writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "QUEUED"})
 			continue
 		}
 
-		command := strings.ToUpper(value.Array[0].Bulk)
 		handler, ok := Handlers[command]
 		if !ok {
 			fmt.Println("Invalid command: ", command)

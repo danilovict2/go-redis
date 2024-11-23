@@ -527,5 +527,6 @@ func exec(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR EXEC without MULTI"}
 	}
 
-	return resp.Value{}
+	server.queueCommands = false
+	return resp.Value{Typ: resp.ARRAY_TYPE}
 }
