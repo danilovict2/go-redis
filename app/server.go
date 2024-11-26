@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -37,7 +39,7 @@ func main() {
 }
 
 func NewServer() *Server {
-	dir := flag.String("dir", "./", "the path to the directory where the RDB file is stored")
+	dir := flag.String("dir", ".", "the path to the directory where the RDB file is stored")
 	dbfilename := flag.String("dbfilename", "dump.rdb", "the name of the RDB file")
 	port := flag.String("port", "6379", "port number")
 	replicaof := flag.String("replicaof", "", "start redis in replica mode")
@@ -167,16 +169,22 @@ func (s *Server) Handle(conn net.Conn) {
 			}
 		}
 
-		if command == "SET" || (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") && len(s.slaves) > 0 {
+		isWriteCommand := slices.Contains(WriteCommands, command)
+		if isWriteCommand || (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") && len(s.slaves) > 0 {
 			s.broadcastch <- value.Marshal()
 		}
 
 		if command == "PSYNC" {
-			data, err := hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
-			if err != nil {
-				fmt.Println("Error while decoding empty RDB file string")
+			path := s.configs["dir"] + "/" + s.configs["dbfilename"]
+			data, err := os.ReadFile(path)
+
+			if os.IsNotExist(err) {
+				data, _ = hex.DecodeString("524544495330303131fa0972656469732d76657205372e322e30fa0a72656469732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2")
+			} else if err != nil {
+				fmt.Println("Error while reading RDB file:", err)
 				break
 			}
+
 			length := strconv.Itoa(len(data))
 			_, err = conn.Write([]byte("$" + length + "\r\n" + string(data)))
 			if err != nil {
@@ -194,7 +202,6 @@ func ExecuteCommand(execute func([]resp.Value) resp.Value, args []resp.Value) re
 }
 
 func (s *Server) connectToMaster() {
-	res := make([]byte, 1024)
 	conn, err := net.Dial("tcp", s.replconf.host+":"+s.replconf.port)
 	if err != nil {
 		fmt.Println("Couldn't connect to the master at ", s.replconf.host+":"+s.replconf.port)
@@ -202,6 +209,7 @@ func (s *Server) connectToMaster() {
 	}
 
 	defer conn.Close()
+	reader := bufio.NewReader(conn)
 
 	msg := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{
 		{
@@ -216,7 +224,7 @@ func (s *Server) connectToMaster() {
 		os.Exit(1)
 	}
 
-	_, err = conn.Read(res)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Error while writing handshake 1/3")
 		os.Exit(1)
@@ -246,7 +254,7 @@ func (s *Server) connectToMaster() {
 		os.Exit(1)
 	}
 
-	_, err = conn.Read(res)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println(err)
 		fmt.Println("Error while reading response 2a/3")
@@ -277,7 +285,7 @@ func (s *Server) connectToMaster() {
 		os.Exit(1)
 	}
 
-	_, err = conn.Read(res)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Error while reading response 2b/3")
 		os.Exit(1)
@@ -307,14 +315,31 @@ func (s *Server) connectToMaster() {
 		os.Exit(1)
 	}
 
-	_, err = conn.Read(res)
+	_, err = reader.ReadString('\n')
 	if err != nil {
 		fmt.Println("Error while reading response 3/3")
 		os.Exit(1)
 	}
 
 	// Read the RDB (ignore it for now)
-	_, _ = conn.Read(res)
+	response, _ := reader.ReadString('\n')
+	if response[0] != '$' {
+		fmt.Printf("Invalid response\n")
+		os.Exit(1)
+	}
+
+	rdbSize, _ := strconv.Atoi(response[1 : len(response)-2])
+	buffer := make([]byte, rdbSize)
+	receivedSize, err := reader.Read(buffer)
+	if err != nil {
+		fmt.Printf("Invalid RDB received %v\n", err)
+		os.Exit(1)
+	}
+
+	if rdbSize != receivedSize {
+		fmt.Printf("Size mismatch - got: %d, want: %d\n", receivedSize, rdbSize)
+	}
+	
 	s.HandleMaster(conn)
 }
 
@@ -351,12 +376,14 @@ func (s *Server) HandleMaster(masterConn net.Conn) {
 			break
 		}
 
-		if command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK" {
+		if command == "REPLCONF" {
 			writer := NewWriter(masterConn)
 			if err = writer.Write(handler(value.Array[1:])); err != nil {
 				fmt.Println("Error while writing the message:", err)
 				continue
 			}
+		} else {
+			handler(value.Array[1:])
 		}
 	}
 }
