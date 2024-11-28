@@ -20,6 +20,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"INFO":     info,
 	"REPLCONF": replconf,
 	"PSYNC":    psync,
+	"WAIT":     wait,
 	"TYPE":     typ,
 	"XADD":     xadd,
 	"XRANGE":   xrange,
@@ -184,7 +185,7 @@ func replconfgetack(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "Invalid GETACK parameter"}
 	}
 
-	offset := strconv.Itoa(max(server.offset - (14 * len(server.slaves)), 0))
+	offset := strconv.Itoa(max(server.offset-(14*len(server.slaves)), 0))
 	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "REPLCONF"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: "ACK"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: offset})
 	return ret
@@ -193,6 +194,10 @@ func replconfgetack(args []resp.Value) resp.Value {
 func psync(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "FULLRESYNC 8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb 0"}
 }
+
+func wait(args []resp.Value) resp.Value {
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(len(server.slaves))}
+} 
 
 func typ(args []resp.Value) resp.Value {
 	if len(args) != 1 {
