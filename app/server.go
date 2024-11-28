@@ -349,7 +349,6 @@ func (s *Server) HandleMaster(masterConn net.Conn) {
 
 	for {
 		value, err := resp.Read()
-		s.offset += len(value.Marshal())
 
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed the connections:", masterConn.RemoteAddr())
@@ -385,6 +384,8 @@ func (s *Server) HandleMaster(masterConn net.Conn) {
 		} else {
 			handler(value.Array[1:])
 		}
+
+		s.offset += len(value.Marshal())
 	}
 }
 

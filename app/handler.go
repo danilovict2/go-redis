@@ -27,7 +27,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"INCR":     incr,
 }
 
-var WriteCommands []string = []string{"PING", "SET", "XADD", "INCR"}
+var WriteCommands []string = []string{"SET", "XADD", "INCR"}
 
 func ping(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
@@ -184,7 +184,7 @@ func replconfgetack(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "Invalid GETACK parameter"}
 	}
 
-	offset := strconv.Itoa(max(server.offset - 14, 0))
+	offset := strconv.Itoa(max(server.offset - (14 * len(server.slaves)), 0))
 	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "REPLCONF"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: "ACK"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: offset})
 	return ret
