@@ -91,7 +91,7 @@ func (s *Server) Start() {
 	if s.replconf.host != "" {
 		s.connectToMaster()
 	} else {
-		go s.propagateLoop()
+		s.propagateLoop()
 	}
 
 	s.Accept()
