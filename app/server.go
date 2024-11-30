@@ -344,7 +344,7 @@ func (s *Server) connectToMaster() {
 		fmt.Printf("Size mismatch - got: %d, want: %d\n", receivedSize, rdbSize)
 	}
 	
-	go s.HandleMaster(conn)
+	s.HandleMaster(conn)
 }
 
 func (s *Server) HandleMaster(masterConn net.Conn) {
