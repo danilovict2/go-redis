@@ -12,7 +12,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
@@ -89,21 +88,12 @@ func (s *Server) Start() {
 	defer l.Close()
 	s.listener = l
 
-	var wg sync.WaitGroup
-
-	if s.replconf.host != "" {
-		wg.Add(1)
-        go func() {
-            defer wg.Done()
-            s.connectToMaster()
-        }()
-
-		fmt.Println("Handshake completed!") 
+	if s.replconf.host != "" && s.replconf.port != "" {
+		s.connectToMaster()
 	} else {
 		go s.propagateLoop()
 	}
 
-	wg.Wait()
 	s.Accept()
 }
 
