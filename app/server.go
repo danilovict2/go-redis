@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
@@ -344,7 +345,8 @@ func (s *Server) connectToMaster() {
 		fmt.Printf("Size mismatch - got: %d, want: %d\n", receivedSize, rdbSize)
 	}
 
-	s.HandleMaster(conn)
+	time.Sleep(time.Second)	
+	go s.HandleMaster(conn)
 }
 
 func (s *Server) HandleMaster(masterConn net.Conn) {
