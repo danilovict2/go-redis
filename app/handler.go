@@ -185,9 +185,13 @@ func replconfgetack(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "Invalid GETACK parameter"}
 	}
 
-	offset := strconv.Itoa(max(server.offset-(14*len(server.slaves)), 0))
+	offset := server.offset
+	for _, slave := range server.slaves {
+		offset += slave.offset
+	}
+
 	ret := resp.Value{Typ: resp.ARRAY_TYPE}
-	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "REPLCONF"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: "ACK"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: offset})
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "REPLCONF"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: "ACK"}, resp.Value{Typ: resp.BULK_TYPE, Bulk: strconv.Itoa(offset)})
 	return ret
 }
 

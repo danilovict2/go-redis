@@ -21,10 +21,15 @@ type ReplicaConfig struct {
 	port string
 }
 
+type Slave struct {
+	conn   net.Conn
+	offset int
+}
+
 type Server struct {
 	configs     map[string]string
 	replconf    ReplicaConfig
-	slaves      []net.Conn
+	slaves      []*Slave
 	listener    net.Listener
 	broadcastch chan []byte
 	offset      int
@@ -84,7 +89,7 @@ func (s *Server) Start() {
 	s.listener = l
 
 	if s.replconf.host != "" {
-		go s.connectToMaster()
+		s.connectToMaster()
 	} else {
 		go s.propagateLoop()
 	}
@@ -192,7 +197,7 @@ func (s *Server) Handle(conn net.Conn) {
 				break
 			}
 
-			s.slaves = append(s.slaves, conn)
+			s.slaves = append(s.slaves, &Slave{conn, 0})
 		}
 	}
 }
@@ -208,7 +213,6 @@ func (s *Server) connectToMaster() {
 		return
 	}
 
-	defer conn.Close()
 	reader := bufio.NewReader(conn)
 
 	msg := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{
@@ -339,8 +343,8 @@ func (s *Server) connectToMaster() {
 	if rdbSize != receivedSize {
 		fmt.Printf("Size mismatch - got: %d, want: %d\n", receivedSize, rdbSize)
 	}
-	
-	s.HandleMaster(conn)
+
+	go s.HandleMaster(conn)
 }
 
 func (s *Server) HandleMaster(masterConn net.Conn) {
@@ -392,13 +396,14 @@ func (s *Server) HandleMaster(masterConn net.Conn) {
 func (s *Server) propagateLoop() {
 	for {
 		msg := <-s.broadcastch
-		s.offset += len(msg)
 
-		for _, server := range s.slaves {
-			_, err := server.Write(msg)
+		for _, slave := range s.slaves {
+			_, err := slave.conn.Write(msg)
 			if err != nil {
-				fmt.Println("Error broadcasting message to server:" + server.RemoteAddr().String())
+				fmt.Println("Error broadcasting message to server:" + slave.conn.RemoteAddr().String())
 			}
+
+			slave.offset += len(msg)
 		}
 	}
 }
