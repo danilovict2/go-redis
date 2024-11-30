@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
@@ -88,12 +89,21 @@ func (s *Server) Start() {
 	defer l.Close()
 	s.listener = l
 
+	var wg sync.WaitGroup
+
 	if s.replconf.host != "" {
-		s.connectToMaster()
+		wg.Add(1)
+        go func() {
+            defer wg.Done()
+            s.connectToMaster()
+        }()
+
+		fmt.Println("Handshake completed!") 
 	} else {
 		go s.propagateLoop()
 	}
 
+	wg.Wait()
 	s.Accept()
 }
 
@@ -343,8 +353,8 @@ func (s *Server) connectToMaster() {
 	if rdbSize != receivedSize {
 		fmt.Printf("Size mismatch - got: %d, want: %d\n", receivedSize, rdbSize)
 	}
-	
-	s.HandleMaster(conn)
+
+	go s.HandleMaster(conn)
 }
 
 func (s *Server) HandleMaster(masterConn net.Conn) {
