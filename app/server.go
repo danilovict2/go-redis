@@ -40,6 +40,7 @@ var server *Server
 func main() {
 	server = NewServer()
 	initRDB(server.configs["dir"], server.configs["dbfilename"])
+	fmt.Println("Listening on port", ":" + server.configs["port"])
 	server.Start()
 }
 
