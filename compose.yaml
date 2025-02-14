@@ -1,7 +1,0 @@
-services:
-  server:
-    build:
-      context: .
-      target: final
-    ports:
-      - 6379:6379
