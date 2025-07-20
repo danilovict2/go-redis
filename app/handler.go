@@ -31,6 +31,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"LRANGE":   lrange,
 	"LPUSH":    lpush,
 	"LLEN":     llen,
+	"LPOP":     lpop,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR"}
@@ -661,4 +662,25 @@ func llen(args []resp.Value) resp.Value {
 
 	list := lists.lists[key]
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
+}
+
+func lpop(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'lpop' command"}
+	}
+
+	key := args[0].Bulk
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	list, ok := lists.lists[key]
+	if !ok || len(list.items) == 0 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	item := list.items[0]
+	list.items = list.items[1:]
+	lists.lists[key] = list
+
+	return item
 }
