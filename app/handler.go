@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,6 +29,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"INCR":     incr,
 	"RPUSH":    rpush,
 	"LRANGE":   lrange,
+	"LPUSH":    lpush,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR"}
@@ -603,7 +605,7 @@ func lrange(args []resp.Value) resp.Value {
 	}
 
 	if start < 0 {
-		start = max(len(list.items) + start, 0)
+		start = max(len(list.items)+start, 0)
 	}
 
 	end, err := strconv.Atoi(args[2].Bulk)
@@ -612,7 +614,7 @@ func lrange(args []resp.Value) resp.Value {
 	}
 
 	if end < 0 {
-		end = max(len(list.items) + end, 0)
+		end = max(len(list.items)+end, 0)
 	}
 
 	if end >= len(list.items) {
@@ -624,4 +626,25 @@ func lrange(args []resp.Value) resp.Value {
 	}
 
 	return resp.Value{Typ: resp.ARRAY_TYPE, Array: list.items[start : end+1]}
+}
+
+func lpush(args []resp.Value) resp.Value {
+	if len(args) < 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'lpush' command"}
+	}
+	key := args[0].Bulk
+
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	list, ok := lists.lists[key]
+	if !ok {
+		list = List{}
+	}
+
+	slices.Reverse(args[1:])
+	list.items = append(args[1:], list.items...)
+
+	lists.lists[key] = list
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }
