@@ -30,6 +30,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"RPUSH":    rpush,
 	"LRANGE":   lrange,
 	"LPUSH":    lpush,
+	"LLEN":     llen,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR"}
@@ -646,5 +647,18 @@ func lpush(args []resp.Value) resp.Value {
 	list.items = append(args[1:], list.items...)
 
 	lists.lists[key] = list
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
+}
+
+func llen(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'llen' command"}
+	}
+
+	key := args[0].Bulk
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	list := lists.lists[key]
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }
