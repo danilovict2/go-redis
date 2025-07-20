@@ -602,9 +602,17 @@ func lrange(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: err.Error()}
 	}
 
+	if start < 0 {
+		start = max(len(list.items) + start, 0)
+	}
+
 	end, err := strconv.Atoi(args[2].Bulk)
 	if err != nil {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: err.Error()}
+	}
+
+	if end < 0 {
+		end = max(len(list.items) + end, 0)
 	}
 
 	if end >= len(list.items) {
