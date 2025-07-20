@@ -26,6 +26,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"XRANGE":   xrange,
 	"XREAD":    xread,
 	"INCR":     incr,
+	"RPUSH":    rpush,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR"}
@@ -200,8 +201,8 @@ func psync(args []resp.Value) resp.Value {
 }
 
 func wait(args []resp.Value) resp.Value {
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(len(server.slaves))}
-} 
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(server.slaves)}
+}
 
 func typ(args []resp.Value) resp.Value {
 	if len(args) != 1 {
@@ -515,7 +516,7 @@ func incr(args []resp.Value) resp.Value {
 	SETs[key] = strconv.Itoa(i + 1)
 	SETsMu.Unlock()
 
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: strconv.Itoa(i + 1)}
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: i + 1}
 }
 
 func multi(queue *Queue) resp.Value {
@@ -547,4 +548,35 @@ func discard(queue *Queue) resp.Value {
 	queue.active = false
 	queue.items = nil
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
+
+type List struct {
+	items []resp.Value
+}
+
+type Lists struct {
+	lists map[string]List
+	mu    sync.Mutex
+}
+
+var lists Lists
+
+func rpush(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'rpush' command"}
+	}
+
+	key := args[0].Bulk
+
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	list, ok := lists.lists[key]
+	if !ok {
+		list = List{}
+	}
+
+	list.items = append(list.items, args[1])
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }

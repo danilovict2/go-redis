@@ -5,7 +5,7 @@ type Value struct {
 	Str   string
 	Bulk  string
 	Array []Value
-	Int   string
+	Int   int
 }
 
 const (

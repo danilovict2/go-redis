@@ -73,7 +73,7 @@ func (v Value) marshalNull() []byte {
 func (v Value) marshalInt() []byte {
 	bytes := make([]byte, 0)
 	bytes = append(bytes, INTEGER)
-	bytes = append(bytes, v.Int...)
+	bytes = append(bytes, fmt.Append(nil, v.Int)...)
 	bytes = append(bytes, '\r', '\n')
 	return bytes
 }
