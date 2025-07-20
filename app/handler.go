@@ -562,7 +562,7 @@ type Lists struct {
 var lists Lists = Lists{lists: make(map[string]List)}
 
 func rpush(args []resp.Value) resp.Value {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'rpush' command"}
 	}
 
@@ -576,7 +576,7 @@ func rpush(args []resp.Value) resp.Value {
 		list = List{}
 	}
 
-	list.items = append(list.items, args[1])
+	list.items = append(list.items, args[1:]...)
 	lists.lists[key] = list
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
