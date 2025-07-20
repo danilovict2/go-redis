@@ -27,6 +27,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"XREAD":    xread,
 	"INCR":     incr,
 	"RPUSH":    rpush,
+	"LRANGE":   lrange,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR"}
@@ -580,4 +581,39 @@ func rpush(args []resp.Value) resp.Value {
 	lists.lists[key] = list
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
+}
+
+func lrange(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'lrange' command"}
+	}
+
+	key := args[0].Bulk
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	list, ok := lists.lists[key]
+	if !ok {
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
+	}
+
+	start, err := strconv.Atoi(args[1].Bulk)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: err.Error()}
+	}
+
+	end, err := strconv.Atoi(args[2].Bulk)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: err.Error()}
+	}
+
+	if end >= len(list.items) {
+		end = len(list.items) - 1
+	}
+
+	if start >= len(list.items) || start > end {
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
+	}
+
+	return resp.Value{Typ: resp.ARRAY_TYPE, Array: list.items[start : end+1]}
 }
