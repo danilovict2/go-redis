@@ -665,8 +665,24 @@ func llen(args []resp.Value) resp.Value {
 }
 
 func lpop(args []resp.Value) resp.Value {
-	if len(args) != 1 {
+	if len(args) > 2 || len(args) < 1 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'lpop' command"}
+	}
+
+	var (
+		n   int = 1
+		err error
+	)
+
+	if len(args) > 1 {
+		fmt.Println(len(args))
+		if n, err = strconv.Atoi(args[1].Bulk); err != nil {
+			return resp.Value{Typ: resp.ERROR_TYPE, Str: err.Error()}
+		}
+	}
+
+	if n < 0 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR value is out of range, must be positive"}
 	}
 
 	key := args[0].Bulk
@@ -678,9 +694,17 @@ func lpop(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
-	item := list.items[0]
-	list.items = list.items[1:]
+	if n >= len(list.items) {
+		n = len(list.items) - 1
+	}
+
+	items := list.items[:n]
+	list.items = list.items[n:]
 	lists.lists[key] = list
 
-	return item
+	if n > 1 {
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: items}
+	}
+
+	return items[0]
 }
