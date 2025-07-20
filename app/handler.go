@@ -559,7 +559,7 @@ type Lists struct {
 	mu    sync.Mutex
 }
 
-var lists Lists
+var lists Lists = Lists{lists: make(map[string]List)}
 
 func rpush(args []resp.Value) resp.Value {
 	if len(args) != 2 {
@@ -577,6 +577,7 @@ func rpush(args []resp.Value) resp.Value {
 	}
 
 	list.items = append(list.items, args[1])
+	lists.lists[key] = list
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }
