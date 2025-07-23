@@ -727,16 +727,43 @@ func blpop(args []resp.Value) resp.Value {
 	}
 
 	key := args[0].Bulk
+	timeout, err := strconv.ParseFloat(args[1].Bulk, 32)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR timeout is not a float or out of range"}
+	}
+
 	lists.mu.Lock()
 	defer lists.mu.Unlock()
 
-	if list, ok := lists.lists[key]; !ok || len(list.items) == 0 {
-		lists.cond.Wait()
-	}
+	var (
+		list   List
+		exists bool
+	)
 
-	list, ok := lists.lists[key]
-	if !ok || len(list.items) == 0 {
-		return resp.Value{Typ: resp.NULL_TYPE}
+	for {
+		list, exists = lists.lists[key]
+		if exists && len(list.items) > 0 {
+			break
+		}
+
+		if timeout == 0 {
+			lists.cond.Wait()
+		} else {
+			timeoutCh := time.After(time.Duration(timeout * float64(time.Second)))
+			waitCh := make(chan struct{})
+			go func() {
+				lists.cond.Wait()
+				waitCh <- struct{}{}
+			}()
+
+			select {
+			case <-waitCh:
+			case <-timeoutCh:
+				lists.cond.Signal()
+				time.Sleep(100 * time.Millisecond) // Wait for the unlock
+				return resp.Value{Typ: resp.NULL_TYPE}
+			}
+		}
 	}
 
 	item := list.items[0]
