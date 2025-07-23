@@ -32,9 +32,10 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"LPUSH":    lpush,
 	"LLEN":     llen,
 	"LPOP":     lpop,
+	"BLPOP":    blpop,
 }
 
-var WriteCommands []string = []string{"SET", "XADD", "INCR"}
+var WriteCommands []string = []string{"SET", "XADD", "INCR", "RPUSH", "LPUSH", "LPOP", "BLPOP"}
 
 func ping(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
@@ -562,9 +563,18 @@ type List struct {
 type Lists struct {
 	lists map[string]List
 	mu    sync.Mutex
+	cond  *sync.Cond
 }
 
-var lists Lists = Lists{lists: make(map[string]List)}
+var lists *Lists = newLists()
+
+func newLists() *Lists {
+	lists := &Lists{
+		lists: make(map[string]List),
+	}
+	lists.cond = sync.NewCond(&lists.mu)
+	return lists
+}
 
 func rpush(args []resp.Value) resp.Value {
 	if len(args) < 2 {
@@ -583,6 +593,7 @@ func rpush(args []resp.Value) resp.Value {
 
 	list.items = append(list.items, args[1:]...)
 	lists.lists[key] = list
+	lists.cond.Signal()
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }
@@ -646,8 +657,9 @@ func lpush(args []resp.Value) resp.Value {
 
 	slices.Reverse(args[1:])
 	list.items = append(args[1:], list.items...)
-
 	lists.lists[key] = list
+	lists.cond.Broadcast()
+
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(list.items)}
 }
 
@@ -707,4 +719,29 @@ func lpop(args []resp.Value) resp.Value {
 	}
 
 	return items[0]
+}
+
+func blpop(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'blpop' command"}
+	}
+
+	key := args[0].Bulk
+	lists.mu.Lock()
+	defer lists.mu.Unlock()
+
+	if list, ok := lists.lists[key]; !ok || len(list.items) == 0 {
+		lists.cond.Wait()
+	}
+
+	list, ok := lists.lists[key]
+	if !ok || len(list.items) == 0 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	item := list.items[0]
+	list.items = list.items[1:]
+	lists.lists[key] = list
+
+	return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{args[0], item}}
 }
