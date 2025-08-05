@@ -12,27 +12,28 @@ import (
 )
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING":     ping,
-	"ECHO":     echo,
-	"SET":      set,
-	"GET":      get,
-	"CONFIG":   config,
-	"KEYS":     keys,
-	"INFO":     info,
-	"REPLCONF": replconf,
-	"PSYNC":    psync,
-	"WAIT":     wait,
-	"TYPE":     typ,
-	"XADD":     xadd,
-	"XRANGE":   xrange,
-	"XREAD":    xread,
-	"INCR":     incr,
-	"RPUSH":    rpush,
-	"LRANGE":   lrange,
-	"LPUSH":    lpush,
-	"LLEN":     llen,
-	"LPOP":     lpop,
-	"BLPOP":    blpop,
+	"PING":      ping,
+	"ECHO":      echo,
+	"SET":       set,
+	"GET":       get,
+	"CONFIG":    config,
+	"KEYS":      keys,
+	"INFO":      info,
+	"REPLCONF":  replconf,
+	"PSYNC":     psync,
+	"WAIT":      wait,
+	"TYPE":      typ,
+	"XADD":      xadd,
+	"XRANGE":    xrange,
+	"XREAD":     xread,
+	"INCR":      incr,
+	"RPUSH":     rpush,
+	"LRANGE":    lrange,
+	"LPUSH":     lpush,
+	"LLEN":      llen,
+	"LPOP":      lpop,
+	"BLPOP":     blpop,
+	"SUBSCRIBE": subscribe,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR", "RPUSH", "LPUSH", "LPOP", "BLPOP"}
@@ -771,4 +772,16 @@ func blpop(args []resp.Value) resp.Value {
 	lists.lists[key] = list
 
 	return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{args[0], item}}
+}
+
+func subscribe(args []resp.Value) resp.Value {
+	if len(args) < 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'subscribe' command"}
+	}
+
+	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "subscribe"})
+	ret.Array = append(ret.Array, args[0])
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: 1})
+	return ret
 }
