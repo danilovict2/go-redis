@@ -120,6 +120,7 @@ func (s *Server) Handle(conn net.Conn) {
 	res := NewResp(conn)
 	queue := Queue{active: false, items: make([]resp.Value, 0)}
 	subscribes := make(map[string]bool)
+	subscribedMode := false
 
 	for {
 		value, err := res.Read()
@@ -144,6 +145,11 @@ func (s *Server) Handle(conn net.Conn) {
 		command := strings.ToUpper(value.Array[0].Bulk)
 		writer := NewWriter(conn)
 
+		if subscribedMode && !slices.Contains(SubscribedModeCommands, command) {
+			writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: fmt.Sprintf("ERR Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command)})
+			continue
+		}
+
 		switch command {
 		case "MULTI":
 			if queue.active {
@@ -156,6 +162,7 @@ func (s *Server) Handle(conn net.Conn) {
 		case "DISCARD":
 			writer.Write(discard(&queue))
 		case "SUBSCRIBE":
+			subscribedMode = true
 			writer.Write(subscribe(value.Array[1:], subscribes))
 		default:
 			handler, ok := Handlers[command]

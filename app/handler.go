@@ -12,30 +12,33 @@ import (
 )
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING":      ping,
-	"ECHO":      echo,
-	"SET":       set,
-	"GET":       get,
-	"CONFIG":    config,
-	"KEYS":      keys,
-	"INFO":      info,
-	"REPLCONF":  replconf,
-	"PSYNC":     psync,
-	"WAIT":      wait,
-	"TYPE":      typ,
-	"XADD":      xadd,
-	"XRANGE":    xrange,
-	"XREAD":     xread,
-	"INCR":      incr,
-	"RPUSH":     rpush,
-	"LRANGE":    lrange,
-	"LPUSH":     lpush,
-	"LLEN":      llen,
-	"LPOP":      lpop,
-	"BLPOP":     blpop,
+	"PING":     ping,
+	"ECHO":     echo,
+	"SET":      set,
+	"GET":      get,
+	"CONFIG":   config,
+	"KEYS":     keys,
+	"INFO":     info,
+	"REPLCONF": replconf,
+	"PSYNC":    psync,
+	"WAIT":     wait,
+	"TYPE":     typ,
+	"XADD":     xadd,
+	"XRANGE":   xrange,
+	"XREAD":    xread,
+	"INCR":     incr,
+	"RPUSH":    rpush,
+	"LRANGE":   lrange,
+	"LPUSH":    lpush,
+	"LLEN":     llen,
+	"LPOP":     lpop,
+	"BLPOP":    blpop,
 }
 
-var WriteCommands []string = []string{"SET", "XADD", "INCR", "RPUSH", "LPUSH", "LPOP", "BLPOP"}
+var (
+	WriteCommands          []string = []string{"SET", "XADD", "INCR", "RPUSH", "LPUSH", "LPOP", "BLPOP"}
+	SubscribedModeCommands []string = []string{"SUBSCRIBE", "UNSUBSCRIBE", "PSUBSCRIBE", "PUNSUBSCRIBE", "PING", "QUIT"}
+)
 
 func ping(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
@@ -772,7 +775,6 @@ func blpop(args []resp.Value) resp.Value {
 
 	return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{args[0], item}}
 }
-
 
 func subscribe(args []resp.Value, subscribes map[string]bool) resp.Value {
 	if len(args) < 1 {
