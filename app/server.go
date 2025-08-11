@@ -119,6 +119,7 @@ func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
 	res := NewResp(conn)
 	queue := Queue{active: false, items: make([]resp.Value, 0)}
+	subscribes := make(map[string]bool)
 
 	for {
 		value, err := res.Read()
@@ -154,6 +155,8 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(exec(&queue))
 		case "DISCARD":
 			writer.Write(discard(&queue))
+		case "SUBSCRIBE":
+			writer.Write(subscribe(value.Array[1:], subscribes))
 		default:
 			handler, ok := Handlers[command]
 			if !ok {

@@ -33,7 +33,6 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"LLEN":      llen,
 	"LPOP":      lpop,
 	"BLPOP":     blpop,
-	"SUBSCRIBE": subscribe,
 }
 
 var WriteCommands []string = []string{"SET", "XADD", "INCR", "RPUSH", "LPUSH", "LPOP", "BLPOP"}
@@ -774,14 +773,16 @@ func blpop(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{args[0], item}}
 }
 
-func subscribe(args []resp.Value) resp.Value {
+
+func subscribe(args []resp.Value, subscribes map[string]bool) resp.Value {
 	if len(args) < 1 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'subscribe' command"}
 	}
 
+	subscribes[args[0].Bulk] = true
 	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "subscribe"})
 	ret.Array = append(ret.Array, args[0])
-	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: 1})
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: len(subscribes)})
 	return ret
 }
