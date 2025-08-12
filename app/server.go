@@ -26,13 +26,19 @@ type Slave struct {
 	offset int
 }
 
+type SubscribeChan struct {
+	channel     chan struct{}
+	subscribers int
+}
+
 type Server struct {
-	configs     map[string]string
-	replconf    ReplicaConfig
-	slaves      []*Slave
-	listener    net.Listener
-	broadcastch chan []byte
-	offset      int
+	configs        map[string]string
+	replconf       ReplicaConfig
+	slaves         []*Slave
+	listener       net.Listener
+	broadcastch    chan []byte
+	subscribeChans map[string]*SubscribeChan
+	offset         int
 }
 
 var server *Server
@@ -58,9 +64,10 @@ func NewServer() *Server {
 	}
 
 	server := &Server{
-		configs:     make(map[string]string),
-		replconf:    replconf,
-		broadcastch: make(chan []byte),
+		configs:        make(map[string]string),
+		replconf:       replconf,
+		broadcastch:    make(chan []byte),
+		subscribeChans: map[string]*SubscribeChan{},
 	}
 
 	server.configs["port"] = *port
@@ -119,7 +126,7 @@ func (s *Server) Handle(conn net.Conn) {
 	defer conn.Close()
 	res := NewResp(conn)
 	queue := Queue{active: false, items: make([]resp.Value, 0)}
-	subscribes := make(map[string]bool)
+	subscribes := make(map[string]*SubscribeChan)
 	subscribedMode := false
 
 	for {
@@ -165,7 +172,7 @@ func (s *Server) Handle(conn net.Conn) {
 			subscribedMode = true
 			writer.Write(subscribe(value.Array[1:], subscribes))
 		case "PING":
-			writer.Write(ping(subscribedMode))	
+			writer.Write(ping(subscribedMode))
 		default:
 			handler, ok := Handlers[command]
 			if !ok {

@@ -11,7 +11,9 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 )
 
-var Handlers = map[string]func([]resp.Value) resp.Value{
+type Handler func([]resp.Value) resp.Value
+
+var Handlers = map[string]Handler{
 	"ECHO":     echo,
 	"SET":      set,
 	"GET":      get,
@@ -32,6 +34,7 @@ var Handlers = map[string]func([]resp.Value) resp.Value{
 	"LLEN":     llen,
 	"LPOP":     lpop,
 	"BLPOP":    blpop,
+	"PUBLISH":  publish,
 }
 
 var (
@@ -780,15 +783,31 @@ func blpop(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{args[0], item}}
 }
 
-func subscribe(args []resp.Value, subscribes map[string]bool) resp.Value {
+func subscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.Value {
 	if len(args) < 1 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'subscribe' command"}
 	}
 
-	subscribes[args[0].Bulk] = true
+	channel := args[0].Bulk
+	if _, ok := server.subscribeChans[channel]; !ok {
+		server.subscribeChans[channel] = &SubscribeChan{channel: make(chan struct{}), subscribers: 0}
+	}
+
+	server.subscribeChans[channel].subscribers++
+	subscribes[channel] = server.subscribeChans[channel]
+
 	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "subscribe"})
 	ret.Array = append(ret.Array, args[0])
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: len(subscribes)})
 	return ret
+}
+
+func publish(args []resp.Value) resp.Value {
+	channel, ok := server.subscribeChans[args[0].Bulk]
+	if !ok {
+		channel = &SubscribeChan{subscribers: 0}
+	}
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: channel.subscribers}
 }
