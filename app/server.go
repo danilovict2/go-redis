@@ -164,6 +164,8 @@ func (s *Server) Handle(conn net.Conn) {
 		case "SUBSCRIBE":
 			subscribedMode = true
 			writer.Write(subscribe(value.Array[1:], subscribes))
+		case "PING":
+			writer.Write(ping(subscribedMode))	
 		default:
 			handler, ok := Handlers[command]
 			if !ok {

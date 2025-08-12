@@ -12,7 +12,6 @@ import (
 )
 
 var Handlers = map[string]func([]resp.Value) resp.Value{
-	"PING":     ping,
 	"ECHO":     echo,
 	"SET":      set,
 	"GET":      get,
@@ -40,7 +39,12 @@ var (
 	SubscribedModeCommands []string = []string{"SUBSCRIBE", "UNSUBSCRIBE", "PSUBSCRIBE", "PUNSUBSCRIBE", "PING", "QUIT"}
 )
 
-func ping(args []resp.Value) resp.Value {
+func ping(subscribedMode bool) resp.Value {
+	if subscribedMode {
+		pong := resp.Value{Typ: resp.BULK_TYPE, Bulk: "pong"}
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{pong, resp.Value{Typ: resp.BULK_TYPE}}}
+	}
+
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
 }
 
