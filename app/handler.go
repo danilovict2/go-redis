@@ -790,7 +790,7 @@ func subscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.Val
 
 	channel := args[0].Bulk
 	if _, ok := server.subscribeChans[channel]; !ok {
-		server.subscribeChans[channel] = &SubscribeChan{channel: make(chan struct{}), subscribers: 0}
+		server.subscribeChans[channel] = &SubscribeChan{name: channel, channel: make(chan string), subscribers: 0}
 	}
 
 	server.subscribeChans[channel].subscribers++
@@ -804,9 +804,17 @@ func subscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.Val
 }
 
 func publish(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'publish' command"}
+	}
+
 	channel, ok := server.subscribeChans[args[0].Bulk]
 	if !ok {
-		channel = &SubscribeChan{subscribers: 0}
+		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
+	}
+
+	for range channel.subscribers {
+		channel.channel <- args[1].Bulk
 	}
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: channel.subscribers}
