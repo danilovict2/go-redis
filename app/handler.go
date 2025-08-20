@@ -819,3 +819,24 @@ func publish(args []resp.Value) resp.Value {
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: channel.subscribers}
 }
+
+func unsubscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.Value {
+	if len(args) < 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'unsubscribe' command"}
+	}
+
+	name := args[0].Bulk
+	channel, ok := server.subscribeChans[name]
+	if !ok {
+		channel = &SubscribeChan{name: name, channel: make(chan string), subscribers: 1}
+	}
+
+	channel.subscribers--
+	delete(subscribes, name)
+
+	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "unsubscribe"})
+	ret.Array = append(ret.Array, args[0])
+	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: len(subscribes)})
+	return ret
+}

@@ -173,6 +173,9 @@ func (s *Server) Handle(conn net.Conn) {
 			subscribedMode = true
 			writer.Write(subscribe(value.Array[1:], subscribes))
 			go receiveMessages(s.subscribeChans[value.Array[1].Bulk], writer)
+		case "UNSUBSCRIBE":
+			subscribedMode = false
+			writer.Write(unsubscribe(value.Array[1:], subscribes))
 		case "PING":
 			writer.Write(ping(subscribedMode))
 		default:
@@ -430,9 +433,11 @@ func (s *Server) propagateLoop() {
 }
 
 func receiveMessages(subscribeChan *SubscribeChan, writer *resp.Writer) {
-	msg := <-subscribeChan.channel
-	response := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{resp.Value{Typ: resp.BULK_TYPE, Bulk: "message"}}}
-	response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: subscribeChan.name})
-	response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: msg})
-	writer.Write(response)
+	for {
+		msg := <-subscribeChan.channel
+		response := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "message"}}}
+		response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: subscribeChan.name})
+		response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: msg})
+		writer.Write(response)
+	}
 }
