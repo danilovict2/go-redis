@@ -35,6 +35,7 @@ var Handlers = map[string]Handler{
 	"LPOP":     lpop,
 	"BLPOP":    blpop,
 	"PUBLISH":  publish,
+	"ZADD":     zadd,
 }
 
 var (
@@ -839,4 +840,31 @@ func unsubscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.V
 	ret.Array = append(ret.Array, args[0])
 	ret.Array = append(ret.Array, resp.Value{Typ: resp.INTEGER_TYPE, Int: len(subscribes)})
 	return ret
+}
+
+var sets = map[string]map[float64]string{}
+var setsmu = sync.Mutex{}
+
+func zadd(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zadd' command"}
+	}
+
+	score, err := strconv.ParseFloat(args[1].Bulk, 64)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR timeout is not a float or out of range"}
+	}
+
+	setsmu.Lock()
+	defer setsmu.Unlock()
+	set, ok := sets[args[0].Bulk]
+	if !ok {
+		set = map[float64]string{}
+	}
+
+	set[score] = args[2].Bulk
+	sets[args[0].Bulk] = set
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(set)}
+
 }
