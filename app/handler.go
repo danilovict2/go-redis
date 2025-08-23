@@ -842,7 +842,7 @@ func unsubscribe(args []resp.Value, subscribes map[string]*SubscribeChan) resp.V
 	return ret
 }
 
-var sets = map[string]map[float64]string{}
+var sets = map[string]map[string]float64{}
 var setsmu = sync.Mutex{}
 
 func zadd(args []resp.Value) resp.Value {
@@ -859,12 +859,15 @@ func zadd(args []resp.Value) resp.Value {
 	defer setsmu.Unlock()
 	set, ok := sets[args[0].Bulk]
 	if !ok {
-		set = map[float64]string{}
+		set = map[string]float64{}
 	}
 
-	set[score] = args[2].Bulk
+	added := 0
+	if _, ok := set[args[2].Bulk]; !ok {
+		added = 1
+		set[args[2].Bulk] = score
+	}
+
 	sets[args[0].Bulk] = set
-
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(set)}
-
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: added}
 }
