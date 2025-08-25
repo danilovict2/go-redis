@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"fmt"
 	"slices"
 	"strconv"
@@ -844,7 +845,7 @@ func unsubscribe(args []resp.Value, subscribes map[string]*SubscribeChan, unsubs
 	return ret
 }
 
-var sets = map[string]map[string]float64{}
+var sets = map[string]*Set{}
 var setsmu = sync.Mutex{}
 
 func zadd(args []resp.Value) resp.Value {
@@ -857,17 +858,24 @@ func zadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR timeout is not a float or out of range"}
 	}
 
+	item := SetMember{Member: args[2].Bulk, Score: score}
+
 	setsmu.Lock()
 	defer setsmu.Unlock()
+
 	set, ok := sets[args[0].Bulk]
 	if !ok {
-		set = map[string]float64{}
+		set = &Set{}
+		heap.Init(set)
 	}
 
+	idx := set.Find(item)
 	added := 0
-	if _, ok := set[args[2].Bulk]; !ok {
+	if idx == -1 {
+		heap.Push(set, item)
 		added = 1
-		set[args[2].Bulk] = score
+	} else {
+		(*set)[idx].Score = score
 	}
 
 	sets[args[0].Bulk] = set
