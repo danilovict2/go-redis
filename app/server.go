@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"slices"
@@ -129,6 +130,7 @@ func (s *Server) Handle(conn net.Conn) {
 	queue := Queue{active: false, items: make([]resp.Value, 0)}
 	subscribes := make(map[string]*SubscribeChan)
 	subscribedMode := false
+	unsubscribeChans := make(map[string]chan struct{})
 
 	for {
 		value, err := res.Read()
@@ -171,11 +173,18 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(discard(&queue))
 		case "SUBSCRIBE":
 			subscribedMode = true
-			writer.Write(subscribe(value.Array[1:], subscribes))
-			go receiveMessages(s.subscribeChans[value.Array[1].Bulk], writer)
+			out := subscribe(value.Array[1:], subscribes)
+			if err := writer.Write(out); err != nil || out.Typ == resp.ERROR_TYPE {
+				log.Println(err)
+				break
+			}
+
+			chName := value.Array[1].Bulk
+			unsubscribeChans[chName] = make(chan struct{})
+			go receiveMessages(s.subscribeChans[chName], unsubscribeChans[chName], writer)
 		case "UNSUBSCRIBE":
 			subscribedMode = false
-			writer.Write(unsubscribe(value.Array[1:], subscribes))
+			writer.Write(unsubscribe(value.Array[1:], subscribes, unsubscribeChans))
 		case "PING":
 			writer.Write(ping(subscribedMode))
 		default:
@@ -432,12 +441,16 @@ func (s *Server) propagateLoop() {
 	}
 }
 
-func receiveMessages(subscribeChan *SubscribeChan, writer *resp.Writer) {
+func receiveMessages(subscribeChan *SubscribeChan, unsubscribeChan chan struct{}, writer *resp.Writer) {
 	for {
-		msg := <-subscribeChan.channel
-		response := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "message"}}}
-		response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: subscribeChan.name})
-		response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: msg})
-		writer.Write(response)
+		select {
+		case msg := <-subscribeChan.channel:
+			response := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "message"}}}
+			response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: subscribeChan.name})
+			response.Array = append(response.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: msg})
+			writer.Write(response)
+		case <-unsubscribeChan:
+			return
+		}
 	}
 }
