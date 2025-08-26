@@ -1,5 +1,9 @@
 package main
 
+import (
+	"math"
+)
+
 type Set []SetMember
 
 type SetMember struct {
@@ -12,7 +16,9 @@ func (s Set) Len() int {
 }
 
 func (s Set) Less(i, j int) bool {
-	if s[i].Score == s[j].Score {
+	const tolerance = 1e-9
+
+	if math.Abs(s[i].Score-s[j].Score) <= tolerance {
 		return s[i].Member < s[j].Member
 	}
 
@@ -40,9 +46,9 @@ func (s *Set) Pop() any {
 	return x
 }
 
-func (s Set) Find(member SetMember) int {
+func (s Set) Find(member string) int {
 	for i, m := range s {
-		if m.Member == member.Member {
+		if m.Member == member {
 			return i
 		}
 	}

@@ -37,6 +37,7 @@ var Handlers = map[string]Handler{
 	"BLPOP":    blpop,
 	"PUBLISH":  publish,
 	"ZADD":     zadd,
+	"ZRANK":    zrank,
 }
 
 var (
@@ -858,8 +859,6 @@ func zadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR timeout is not a float or out of range"}
 	}
 
-	item := SetMember{Member: args[2].Bulk, Score: score}
-
 	setsmu.Lock()
 	defer setsmu.Unlock()
 
@@ -869,9 +868,10 @@ func zadd(args []resp.Value) resp.Value {
 		heap.Init(set)
 	}
 
-	idx := set.Find(item)
+	idx := set.Find(args[2].Bulk)
 	added := 0
 	if idx == -1 {
+		item := SetMember{Member: args[2].Bulk, Score: score}
 		heap.Push(set, item)
 		added = 1
 	} else {
@@ -880,4 +880,25 @@ func zadd(args []resp.Value) resp.Value {
 
 	sets[args[0].Bulk] = set
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: added}
+}
+
+func zrank(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zrank' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	idx := set.Find(args[1].Bulk)
+	if idx == -1 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: idx}
 }
