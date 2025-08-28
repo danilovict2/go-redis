@@ -41,6 +41,7 @@ var Handlers = map[string]Handler{
 	"ZRANK":    zrank,
 	"ZRANGE":   zrange,
 	"ZCARD":    zcard,
+	"ZSCORE":   zscore,
 }
 
 var (
@@ -984,4 +985,25 @@ func zcard(args []resp.Value) resp.Value {
 	}
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(*set)}
+}
+
+func zscore(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zscore' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	idx := set.Find(args[1].Bulk)
+	if idx == -1 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint((*set)[idx].Score)}
 }
