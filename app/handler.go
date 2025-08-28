@@ -38,6 +38,7 @@ var Handlers = map[string]Handler{
 	"PUBLISH":  publish,
 	"ZADD":     zadd,
 	"ZRANK":    zrank,
+	"ZRANGE":   zrange,
 }
 
 var (
@@ -856,7 +857,7 @@ func zadd(args []resp.Value) resp.Value {
 
 	score, err := strconv.ParseFloat(args[1].Bulk, 64)
 	if err != nil {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR timeout is not a float or out of range"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR score is not a float or out of range"}
 	}
 
 	setsmu.Lock()
@@ -901,4 +902,52 @@ func zrank(args []resp.Value) resp.Value {
 	}
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: idx}
+}
+
+func zrange(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zrange' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.ARRAY_TYPE}
+	}
+
+	start, err := strconv.Atoi(args[1].Bulk)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR start is not a int or out of range"}
+	}
+
+	end, err := strconv.Atoi(args[2].Bulk)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR end is not a int or out of range"}
+	}
+
+	if start >= len(*set) || start > end {
+		return resp.Value{Typ: resp.ARRAY_TYPE}
+	}
+
+	end = min(end+1, len(*set))
+	elems := make([]SetMember, 0)
+	for range start {
+		elem := heap.Pop(set).(SetMember)
+		elems = append(elems, elem)
+	}
+
+	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
+	for i := start; i < end; i++ {
+		elem := heap.Pop(set).(SetMember)
+		elems = append(elems, elem)
+		ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: elem.Member})
+	}
+
+	for _, elem := range elems {
+		heap.Push(set, elem)
+	}
+
+	return ret
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"math"
 )
 
@@ -46,12 +47,23 @@ func (s *Set) Pop() any {
 	return x
 }
 
-func (s Set) Find(member string) int {
-	for i, m := range s {
-		if m.Member == member {
-			return i
+func (s *Set) Find(member string) int {
+	idx := -1
+	elems := make([]SetMember, 0)
+
+	for i := 0; len(*s) > 0; i++ {
+		elem := heap.Pop(s).(SetMember)
+		elems = append(elems, elem)
+
+		if elem.Member == member {
+			idx = i
+			break
 		}
 	}
 
-	return -1
+	for _, elem := range elems {
+		heap.Push(s, elem)
+	}
+
+	return idx
 }
