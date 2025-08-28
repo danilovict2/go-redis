@@ -40,6 +40,7 @@ var Handlers = map[string]Handler{
 	"ZADD":     zadd,
 	"ZRANK":    zrank,
 	"ZRANGE":   zrange,
+	"ZCARD":    zcard,
 }
 
 var (
@@ -940,7 +941,7 @@ func zrange(args []resp.Value) resp.Value {
 		if math.Abs(float64(end)) >= float64(len(*set)) {
 			end = 0
 		} else {
-			end = len(*set) + end 
+			end = len(*set) + end
 		}
 	}
 
@@ -967,4 +968,20 @@ func zrange(args []resp.Value) resp.Value {
 	}
 
 	return ret
+}
+
+func zcard(args []resp.Value) resp.Value {
+	if len(args) != 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zcard' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
+	}
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: len(*set)}
 }
