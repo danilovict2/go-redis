@@ -42,6 +42,7 @@ var Handlers = map[string]Handler{
 	"ZRANGE":   zrange,
 	"ZCARD":    zcard,
 	"ZSCORE":   zscore,
+	"ZREM":     zrem,
 }
 
 var (
@@ -52,7 +53,7 @@ var (
 func ping(subscribedMode bool) resp.Value {
 	if subscribedMode {
 		pong := resp.Value{Typ: resp.BULK_TYPE, Bulk: "pong"}
-		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{pong, resp.Value{Typ: resp.BULK_TYPE}}}
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{pong, {Typ: resp.BULK_TYPE}}}
 	}
 
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "PONG"}
@@ -872,10 +873,10 @@ func zadd(args []resp.Value) resp.Value {
 		heap.Init(set)
 	}
 
-	idx := set.Find(args[2].Bulk)
+	item := SetMember{Member: args[2].Bulk, Score: score}
+	idx := set.FindByIndex(args[2].Bulk)
 	added := 0
 	if idx == -1 {
-		item := SetMember{Member: args[2].Bulk, Score: score}
 		heap.Push(set, item)
 		added = 1
 	} else {
@@ -899,7 +900,7 @@ func zrank(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
-	idx := set.Find(args[1].Bulk)
+	idx := set.FindByRank(args[1].Bulk)
 	if idx == -1 {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
@@ -1000,10 +1001,43 @@ func zscore(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
-	idx := set.Find(args[1].Bulk)
+	idx := set.FindByIndex(args[1].Bulk)
 	if idx == -1 {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
+	fmt.Println(*set, idx)
 	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint((*set)[idx].Score)}
+}
+
+func zrem(args []resp.Value) resp.Value {
+	if len(args) != 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'zrem' command"}
+	}
+
+	setsmu.Lock()
+	defer setsmu.Unlock()
+	set, ok := sets[args[0].Bulk]
+
+	if !ok || len(*set) == 0 {
+		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
+	}
+
+	elems := make([]SetMember, 0)
+	removed := 0
+	for len(*set) > 0 {
+		elem := heap.Pop(set).(SetMember)
+		if elem.Member == args[1].Bulk {
+			removed = 1
+			break
+		}
+
+		elems = append(elems, elem)
+	}
+
+	for _, elem := range elems {
+		heap.Push(set, elem)
+	}
+	sets[args[0].Bulk] = set
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: removed}
 }

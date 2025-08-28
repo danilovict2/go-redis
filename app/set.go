@@ -47,7 +47,17 @@ func (s *Set) Pop() any {
 	return x
 }
 
-func (s *Set) Find(member string) int {
+func (s *Set) FindByIndex(member string) int {
+	for i, elem := range *s {
+		if elem.Member == member {
+			return i
+		}
+	}
+
+	return -1
+}
+
+func (s *Set) FindByRank(member string) int {
 	idx := -1
 	elems := make([]SetMember, 0)
 
