@@ -3,6 +3,7 @@ package main
 import (
 	"container/heap"
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -927,11 +928,27 @@ func zrange(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR end is not a int or out of range"}
 	}
 
+	if start < 0 {
+		if math.Abs(float64(start)) >= float64(len(*set)) {
+			start = 0
+		} else {
+			start = len(*set) + start
+		}
+	}
+
+	if end < 0 {
+		if math.Abs(float64(end)) >= float64(len(*set)) {
+			end = 0
+		} else {
+			end = len(*set) + end 
+		}
+	}
+
 	if start >= len(*set) || start > end {
 		return resp.Value{Typ: resp.ARRAY_TYPE}
 	}
 
-	end = min(end+1, len(*set))
+	end = min(end, len(*set)-1)
 	elems := make([]SetMember, 0)
 	for range start {
 		elem := heap.Pop(set).(SetMember)
@@ -939,7 +956,7 @@ func zrange(args []resp.Value) resp.Value {
 	}
 
 	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
-	for i := start; i < end; i++ {
+	for i := start; i <= end; i++ {
 		elem := heap.Pop(set).(SetMember)
 		elems = append(elems, elem)
 		ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: elem.Member})
