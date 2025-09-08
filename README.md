@@ -340,6 +340,104 @@ $ redis-cli
 3) (integer) 0
 ```
 
+### Sorted Sets
+
+#### Create a sorted set and add members
+
+```bash
+> ZADD zset_key 0.0043 foo
+(integer) 1
+> ZADD zset_key 8.0 bar
+(integer) 1
+
+# No new members were added
+> ZADD zset_key 10.0 bar
+(integer) 0
+```
+
+#### Retrieve member rank
+
+```bash
+> ZADD zset_key 1.0 member_with_score_1
+(integer) 1
+> ZADD zset_key 2.0 member_with_score_2
+(integer) 1
+> ZADD zset_key 2.0 another_member_with_score_2
+(integer) 1
+
+
+> ZRANK zset_key member_with_score_1
+(integer) 0
+> ZRANK zset_key member_with_score_2
+(integer) 2
+> ZRANK zset_key another_member_with_score_2
+(integer) 1
+```
+
+#### List members
+
+```bash
+> ZADD racer_scores 8.5 "Sam-Bodden"
+(integer) 1
+> ZADD racer_scores 10.2 "Royce"
+(integer) 1
+> ZADD racer_scores 6.1 "Ford"
+(integer) 1
+> ZADD racer_scores 14.9 "Prickett"
+(integer) 1
+> ZADD racer_scores 10.2 "Ben"
+(integer) 1
+
+
+# List last 2 elements
+> ZRANGE racer_scores -2 -1
+1) "Royce"
+2) "Prickett"
+
+# List members from index 0 to 2
+> ZRANGE racer_scores 0 2
+1) "Ford"
+2) "Sam-Bodden"
+3) "Royce"
+```
+
+#### Count sorted set members
+
+```bash
+> ZADD zset_key 1.2 "one"
+(integer) 1
+> ZADD zset_key 2.2 "two"
+(integer) 1
+> ZCARD zset_key
+(integer) 2
+```
+
+#### Retrieve member score
+
+```bash
+> ZADD zset_key 24.34 "one"
+(integer) 1
+> ZSCORE zset_key "one"
+"24.34"
+```
+
+#### Remove a member
+
+```bash
+> ZADD racer_scores 8.3 "Sam-Bodden"
+(integer) 1
+> ZADD racer_scores 10.5 "Royce"
+(integer) 1
+
+# Remove "Royce" from the sorted set
+> ZREM racer_scores "Royce"
+(integer) 1
+
+# List the remaining members
+> ZRANGE racer_scores 0 -1
+1) "Sam-Bodden"
+```
+
 ## 🤝 Contributing
 
 ### Build the project
