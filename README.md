@@ -298,6 +298,47 @@ $ redis-cli BLPOP list_key 0.1
 # (Blocks for 0.1 seconds)
 ```
 
+### Pub/Sub
+
+#### Subscribe to a channel
+
+```bash
+$ redis-cli
+> SUBSCRIBE mychan
+1) "subscribe"
+2) "mychan"
+3) (integer) 1
+Reading messages... (press Ctrl-C to quit or any key to type command)
+```
+
+#### Publish a message
+
+```bash
+> PUBLISH channel_name message_contents
+(integer) 3
+```
+
+#### Unsubscribe
+
+```bash
+$ redis-cli
+> SUBSCRIBE foo
+1) "subscribe"
+2) "foo"
+3) (integer) 1
+(subscribed mode)> SUBSCRIBE bar
+1) "subscribe"
+2) "bar"
+3) (integer) 2
+(subscribed mode)> UNSUBSCRIBE foo
+1) "unsubscribe"
+2) "foo"
+3) (integer) 1
+(subscribed mode)> UNSUBSCRIBE bar
+1) "unsubscribe"
+2) "bar"
+3) (integer) 0
+```
 
 ## 🤝 Contributing
 
