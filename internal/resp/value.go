@@ -22,5 +22,6 @@ const (
 	STRING_TYPE  = "string"
 	ERROR_TYPE   = "error"
 	NULL_TYPE    = "null"
+	NULL_ARRAY   = "null_array"
 	INTEGER_TYPE = "int"
 )

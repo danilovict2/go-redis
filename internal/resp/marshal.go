@@ -19,6 +19,8 @@ func (v Value) Marshal() []byte {
 		return v.marshalNull()
 	case INTEGER_TYPE:
 		return v.marshalInt()
+	case NULL_ARRAY:
+		return v.marshalNullArray()
 	default:
 		fmt.Printf("Unknown type: %v", v.Typ)
 		return []byte{}
@@ -68,6 +70,10 @@ func (v Value) marshalError() []byte {
 
 func (v Value) marshalNull() []byte {
 	return []byte("$-1\r\n")
+}
+
+func (v Value) marshalNullArray() []byte {
+	return []byte("*-1\r\n")
 }
 
 func (v Value) marshalInt() []byte {
