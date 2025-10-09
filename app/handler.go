@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
+	s "github.com/codecrafters-io/redis-starter-go/internal/set"
 )
 
 type Handler func([]resp.Value) resp.Value
@@ -779,7 +780,7 @@ func blpop(args []resp.Value) resp.Value {
 			case <-timeoutCh:
 				lists.cond.Signal()
 				time.Sleep(100 * time.Millisecond) // Wait for the unlock
-				return resp.Value{Typ: resp.NULL_TYPE}
+				return resp.Value{Typ: resp.NULL_ARRAY}
 			}
 		}
 	}
@@ -851,7 +852,7 @@ func unsubscribe(args []resp.Value, subscribes map[string]*SubscribeChan, unsubs
 	return ret
 }
 
-var sets = map[string]*Set{}
+var sets = map[string]*s.Set{}
 var setsmu = sync.Mutex{}
 
 func zadd(args []resp.Value) resp.Value {
@@ -869,18 +870,18 @@ func zadd(args []resp.Value) resp.Value {
 
 	set, ok := sets[args[0].Bulk]
 	if !ok {
-		set = &Set{}
+		set = &s.Set{}
 		heap.Init(set)
 	}
 
-	item := SetMember{Member: args[2].Bulk, Score: score}
+	item := s.SetMember{Member: args[2].Bulk, Score: s.RegularSetScore(score)}
 	idx := set.FindByIndex(args[2].Bulk)
 	added := 0
 	if idx == -1 {
 		heap.Push(set, item)
 		added = 1
 	} else {
-		(*set)[idx].Score = score
+		(*set)[idx].Score = s.RegularSetScore(score)
 	}
 
 	sets[args[0].Bulk] = set
@@ -952,15 +953,15 @@ func zrange(args []resp.Value) resp.Value {
 	}
 
 	end = min(end, len(*set)-1)
-	elems := make([]SetMember, 0)
+	elems := make([]s.SetMember, 0)
 	for range start {
-		elem := heap.Pop(set).(SetMember)
+		elem := heap.Pop(set).(s.SetMember)
 		elems = append(elems, elem)
 	}
 
 	ret := resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{}}
 	for i := start; i <= end; i++ {
-		elem := heap.Pop(set).(SetMember)
+		elem := heap.Pop(set).(s.SetMember)
 		elems = append(elems, elem)
 		ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: elem.Member})
 	}
@@ -1023,10 +1024,10 @@ func zrem(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
 	}
 
-	elems := make([]SetMember, 0)
+	elems := make([]s.SetMember, 0)
 	removed := 0
 	for len(*set) > 0 {
-		elem := heap.Pop(set).(SetMember)
+		elem := heap.Pop(set).(s.SetMember)
 		if elem.Member == args[1].Bulk {
 			removed = 1
 			break
