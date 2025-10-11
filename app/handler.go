@@ -1053,13 +1053,13 @@ func geoadd(args []resp.Value) resp.Value {
 	}
 
 	long, err := strconv.ParseFloat(args[1].Bulk, 64)
-	if err != nil {
+	if err != nil || long < -180 || long > 180 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
 	}
 
 	lat, err := strconv.ParseFloat(args[2].Bulk, 64)
-	if err != nil {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR lat is not a float or out of range"}
+	if err != nil || lat < -85.05112878 || lat > 85.05112878 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
 	}
 
 	geomu.Lock()
