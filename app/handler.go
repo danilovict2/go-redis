@@ -866,27 +866,36 @@ func zadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR score is not a float or out of range"}
 	}
 
+	entry := s.SetMember{Member: args[2].Bulk, Score: s.RegularSetScore(score)}
+	added := addToSet(args[0].Bulk, entry)
+	if added {
+		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
+	}
+
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
+}
+
+func addToSet(name string, entry s.SetMember) bool {
 	setsmu.Lock()
 	defer setsmu.Unlock()
 
-	set, ok := sets[args[0].Bulk]
+	set, ok := sets[name]
 	if !ok {
 		set = &s.Set{}
 		heap.Init(set)
 	}
 
-	item := s.SetMember{Member: args[2].Bulk, Score: s.RegularSetScore(score)}
-	idx := set.FindByIndex(args[2].Bulk)
-	added := 0
+	added := false
+	idx := set.FindByIndex(entry.Member)
 	if idx == -1 {
-		heap.Push(set, item)
-		added = 1
+		heap.Push(set, entry)
+		added = true
 	} else {
-		(*set)[idx].Score = s.RegularSetScore(score)
+		(*set)[idx].Score = entry.Score
 	}
 
-	sets[args[0].Bulk] = set
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: added}
+	sets[name] = set
+	return added
 }
 
 func zrank(args []resp.Value) resp.Value {
@@ -1044,9 +1053,6 @@ func zrem(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: removed}
 }
 
-var geo = map[string]*s.Set{}
-var geomu = sync.Mutex{}
-
 func geoadd(args []resp.Value) resp.Value {
 	if len(args) != 4 {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'geoadd' command"}
@@ -1062,25 +1068,11 @@ func geoadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
 	}
 
-	geomu.Lock()
-	defer geomu.Unlock()
-
-	set, ok := geo[args[0].Bulk]
-	if !ok {
-		set = &s.Set{}
-		heap.Init(set)
+	entry := s.SetMember{Member: args[3].Bulk, Score: s.GeoSetScore{Longitude: long, Latitude: lat}}
+	added := addToSet(args[0].Bulk, entry)
+	if added {
+		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
 	}
 
-	item := s.SetMember{Member: args[2].Bulk, Score: s.GeoSetScore{Longitude: long, Latitude: lat}}
-	idx := set.FindByIndex(args[2].Bulk)
-	added := 0
-	if idx == -1 {
-		heap.Push(set, item)
-		added = 1
-	} else {
-		(*set)[idx].Score = s.GeoSetScore{Longitude: long, Latitude: lat}
-	}
-
-	geo[args[0].Bulk] = set
-	return resp.Value{Typ: resp.INTEGER_TYPE, Int: added}
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
 }
