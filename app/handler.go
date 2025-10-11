@@ -44,6 +44,7 @@ var Handlers = map[string]Handler{
 	"ZCARD":    zcard,
 	"ZSCORE":   zscore,
 	"ZREM":     zrem,
+	"GEOADD":   geoadd,
 }
 
 var (
@@ -1041,4 +1042,45 @@ func zrem(args []resp.Value) resp.Value {
 	}
 	sets[args[0].Bulk] = set
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: removed}
+}
+
+var geo = map[string]*s.Set{}
+var geomu = sync.Mutex{}
+
+func geoadd(args []resp.Value) resp.Value {
+	if len(args) != 4 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'geoadd' command"}
+	}
+
+	long, err := strconv.ParseFloat(args[1].Bulk, 64)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
+	}
+
+	lat, err := strconv.ParseFloat(args[2].Bulk, 64)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR lat is not a float or out of range"}
+	}
+
+	geomu.Lock()
+	defer geomu.Unlock()
+
+	set, ok := geo[args[0].Bulk]
+	if !ok {
+		set = &s.Set{}
+		heap.Init(set)
+	}
+
+	item := s.SetMember{Member: args[2].Bulk, Score: s.GeoSetScore{Longitude: long, Latitude: lat}}
+	idx := set.FindByIndex(args[2].Bulk)
+	added := 0
+	if idx == -1 {
+		heap.Push(set, item)
+		added = 1
+	} else {
+		(*set)[idx].Score = s.GeoSetScore{Longitude: long, Latitude: lat}
+	}
+
+	geo[args[0].Bulk] = set
+	return resp.Value{Typ: resp.INTEGER_TYPE, Int: added}
 }
