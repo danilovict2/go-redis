@@ -1017,7 +1017,6 @@ func zscore(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.NULL_TYPE}
 	}
 
-	fmt.Println(*set, idx)
 	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint((*set)[idx].Score)}
 }
 
@@ -1059,16 +1058,16 @@ func geoadd(args []resp.Value) resp.Value {
 	}
 
 	long, err := strconv.ParseFloat(args[1].Bulk, 64)
-	if err != nil || long < -180 || long > 180 {
+	if err != nil || long < s.MinLongitude || long > s.MaxLongitude {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
 	}
 
 	lat, err := strconv.ParseFloat(args[2].Bulk, 64)
-	if err != nil || lat < -85.05112878 || lat > 85.05112878 {
+	if err != nil || lat < s.MinLatitude || lat > s.MaxLatitude {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
 	}
 
-	entry := s.SetMember{Member: args[3].Bulk, Score: s.GeoSetScore{Longitude: long, Latitude: lat}}
+	entry := s.SetMember{Member: args[3].Bulk, Score: s.NewGeoSetScore(long, lat)}
 	added := addToSet(args[0].Bulk, entry)
 	if added {
 		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
