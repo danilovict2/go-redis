@@ -47,6 +47,7 @@ var Handlers = map[string]Handler{
 	"ZREM":     zrem,
 	"GEOADD":   geoadd,
 	"GEOPOS":   geopos,
+	"GEODIST":  geodist,
 }
 
 var (
@@ -1108,4 +1109,34 @@ func geopos(args []resp.Value) resp.Value {
 	}
 
 	return ret
+}
+
+func geodist(args []resp.Value) resp.Value {
+	if len(args) != 3 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'geodist' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	idx1 := set.FindByIndex(args[1].Bulk)
+	if idx1 == -1 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	idx2 := set.FindByIndex(args[2].Bulk)
+	if idx2 == -1 {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	pos1 := geohash.DecodeGeoScore(int((*set)[idx1].Score))
+	pos2 := geohash.DecodeGeoScore(int((*set)[idx2].Score))
+	dist := geohash.Hsdist(geohash.DegPos(pos1.Lat, pos1.Long), geohash.DegPos(pos2.Lat, pos2.Long))
+
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(dist * 1000)}
 }
