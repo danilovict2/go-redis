@@ -1,6 +1,4 @@
-package set
-
-import "fmt"
+package geohash
 
 const (
 	MinLatitude  float64 = -85.05112878
@@ -12,22 +10,8 @@ const (
 	LongitudeRange float64 = MaxLongitude - MinLongitude
 )
 
-type GeoSetScore struct {
-	Longitude float64
-	Latitude  float64
-	score     int // Used for comparison
-}
-
-func (s GeoSetScore) String() string {
-	return fmt.Sprint(s.score)
-}
-
-func NewGeoSetScore(long, lat float64) GeoSetScore {
-	return GeoSetScore{
-		Longitude: long,
-		Latitude:  lat,
-		score:     generateScoreFrom(long, lat),
-	}
+func ComputeGeoScore(long, lat float64) int {
+	return generateScoreFrom(long, lat)
 }
 
 func generateScoreFrom(long, lat float64) int {
@@ -54,22 +38,4 @@ func spreadInt32ToInt64(x int) int {
 	x = (x | (x << 1)) & 0x5555555555555555
 
 	return x
-}
-
-func (this GeoSetScore) Less(other SetScore) bool {
-	o, ok := other.(GeoSetScore)
-	if !ok {
-		return false
-	}
-
-	return this.score < o.score
-}
-
-func (this GeoSetScore) Equal(other SetScore) bool {
-	o, ok := other.(GeoSetScore)
-	if !ok {
-		return false
-	}
-
-	return this.score == o.score
 }

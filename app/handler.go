@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codecrafters-io/redis-starter-go/internal/geohash"
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 	s "github.com/codecrafters-io/redis-starter-go/internal/set"
 )
@@ -866,8 +867,7 @@ func zadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR score is not a float or out of range"}
 	}
 
-	entry := s.SetMember{Member: args[2].Bulk, Score: s.RegularSetScore(score)}
-	added := addToSet(args[0].Bulk, entry)
+	added := addToSet(args[0].Bulk, args[2].Bulk, score)
 	if added {
 		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
 	}
@@ -875,7 +875,7 @@ func zadd(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
 }
 
-func addToSet(name string, entry s.SetMember) bool {
+func addToSet(name, member string, score float64) bool {
 	setsmu.Lock()
 	defer setsmu.Unlock()
 
@@ -886,12 +886,13 @@ func addToSet(name string, entry s.SetMember) bool {
 	}
 
 	added := false
-	idx := set.FindByIndex(entry.Member)
+	idx := set.FindByIndex(member)
 	if idx == -1 {
+		entry := s.SetMember{Member: member, Score: score}
 		heap.Push(set, entry)
 		added = true
 	} else {
-		(*set)[idx].Score = entry.Score
+		(*set)[idx].Score = score
 	}
 
 	sets[name] = set
@@ -1058,17 +1059,16 @@ func geoadd(args []resp.Value) resp.Value {
 	}
 
 	long, err := strconv.ParseFloat(args[1].Bulk, 64)
-	if err != nil || long < s.MinLongitude || long > s.MaxLongitude {
+	if err != nil || long < geohash.MinLongitude || long > geohash.MaxLongitude {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
 	}
 
 	lat, err := strconv.ParseFloat(args[2].Bulk, 64)
-	if err != nil || lat < s.MinLatitude || lat > s.MaxLatitude {
+	if err != nil || lat < geohash.MinLatitude || lat > geohash.MaxLatitude {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
 	}
 
-	entry := s.SetMember{Member: args[3].Bulk, Score: s.NewGeoSetScore(long, lat)}
-	added := addToSet(args[0].Bulk, entry)
+	added := addToSet(args[0].Bulk, args[3].Bulk, float64(geohash.ComputeGeoScore(long, lat)))
 	if added {
 		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
 	}

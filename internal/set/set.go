@@ -2,18 +2,14 @@ package set
 
 import (
 	"container/heap"
+	"math"
 )
 
 type Set []SetMember
 
-type SetScore interface {
-	Less(other SetScore) bool
-	Equal(other SetScore) bool
-}
-
 type SetMember struct {
 	Member string
-	Score  SetScore
+	Score  float64
 }
 
 func (s Set) Len() int {
@@ -21,11 +17,13 @@ func (s Set) Len() int {
 }
 
 func (s Set) Less(i, j int) bool {
-	if s[i].Score.Equal(s[j].Score) {
+	const tolerance = 1e-9
+
+	if math.Abs(s[i].Score-s[j].Score) <= tolerance {
 		return s[i].Member < s[j].Member
 	}
 
-	return s[i].Score.Less(s[j].Score)
+	return s[i].Score < s[j].Score
 }
 
 func (s Set) Swap(i, j int) {
