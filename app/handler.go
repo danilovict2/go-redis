@@ -46,6 +46,7 @@ var Handlers = map[string]Handler{
 	"ZSCORE":   zscore,
 	"ZREM":     zrem,
 	"GEOADD":   geoadd,
+	"GEOPOS":   geopos,
 }
 
 var (
@@ -1068,10 +1069,43 @@ func geoadd(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
 	}
 
-	added := addToSet(args[0].Bulk, args[3].Bulk, float64(geohash.ComputeGeoScore(long, lat)))
+	added := addToSet(args[0].Bulk, args[3].Bulk, float64(geohash.EncodeGeoScore(long, lat)))
 	if added {
 		return resp.Value{Typ: resp.INTEGER_TYPE, Int: 1}
 	}
 
 	return resp.Value{Typ: resp.INTEGER_TYPE, Int: 0}
+}
+
+func geopos(args []resp.Value) resp.Value {
+	if len(args) < 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'geopos' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		ret := resp.Value{Typ: resp.ARRAY_TYPE}
+		for range len(args[1:]) {
+			ret.Array = append(ret.Array, resp.Value{Typ: resp.NULL_ARRAY})
+		}
+
+		return ret
+	}
+
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
+	for _, location := range args[1:] {
+		idx := set.FindByIndex(location.Bulk)
+		if idx == -1 {
+			ret.Array = append(ret.Array, resp.Value{Typ: resp.NULL_ARRAY})
+			continue
+		}
+
+		pos := geohash.DecodeGeoScore(int((*set)[idx].Score))
+		ret.Array = append(ret.Array, resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(pos.Long)}, {Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(pos.Lat)}}})
+	}
+
+	return ret
 }
