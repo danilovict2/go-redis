@@ -18,36 +18,37 @@ import (
 type Handler func([]resp.Value) resp.Value
 
 var Handlers = map[string]Handler{
-	"ECHO":     echo,
-	"SET":      set,
-	"GET":      get,
-	"CONFIG":   config,
-	"KEYS":     keys,
-	"INFO":     info,
-	"REPLCONF": replconf,
-	"PSYNC":    psync,
-	"WAIT":     wait,
-	"TYPE":     typ,
-	"XADD":     xadd,
-	"XRANGE":   xrange,
-	"XREAD":    xread,
-	"INCR":     incr,
-	"RPUSH":    rpush,
-	"LRANGE":   lrange,
-	"LPUSH":    lpush,
-	"LLEN":     llen,
-	"LPOP":     lpop,
-	"BLPOP":    blpop,
-	"PUBLISH":  publish,
-	"ZADD":     zadd,
-	"ZRANK":    zrank,
-	"ZRANGE":   zrange,
-	"ZCARD":    zcard,
-	"ZSCORE":   zscore,
-	"ZREM":     zrem,
-	"GEOADD":   geoadd,
-	"GEOPOS":   geopos,
-	"GEODIST":  geodist,
+	"ECHO":      echo,
+	"SET":       set,
+	"GET":       get,
+	"CONFIG":    config,
+	"KEYS":      keys,
+	"INFO":      info,
+	"REPLCONF":  replconf,
+	"PSYNC":     psync,
+	"WAIT":      wait,
+	"TYPE":      typ,
+	"XADD":      xadd,
+	"XRANGE":    xrange,
+	"XREAD":     xread,
+	"INCR":      incr,
+	"RPUSH":     rpush,
+	"LRANGE":    lrange,
+	"LPUSH":     lpush,
+	"LLEN":      llen,
+	"LPOP":      lpop,
+	"BLPOP":     blpop,
+	"PUBLISH":   publish,
+	"ZADD":      zadd,
+	"ZRANK":     zrank,
+	"ZRANGE":    zrange,
+	"ZCARD":     zcard,
+	"ZSCORE":    zscore,
+	"ZREM":      zrem,
+	"GEOADD":    geoadd,
+	"GEOPOS":    geopos,
+	"GEODIST":   geodist,
+	"GEOSEARCH": geosearch,
 }
 
 var (
@@ -1139,4 +1140,56 @@ func geodist(args []resp.Value) resp.Value {
 	dist := geohash.Hsdist(geohash.DegPos(pos1.Lat, pos1.Long), geohash.DegPos(pos2.Lat, pos2.Long))
 
 	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(dist * 1000)}
+}
+
+func geosearch(args []resp.Value) resp.Value {
+	if len(args) != 7 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'geosearch' command"}
+	}
+
+	setsmu.Lock()
+	set, ok := sets[args[0].Bulk]
+	setsmu.Unlock()
+
+	if !ok {
+		return resp.Value{Typ: resp.NULL_ARRAY}
+	}
+
+	long, err := strconv.ParseFloat(args[3].Bulk, 64)
+	if err != nil || long < geohash.MinLongitude || long > geohash.MaxLongitude {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
+	}
+
+	lat, err := strconv.ParseFloat(args[3].Bulk, 64)
+	if err != nil || lat < geohash.MinLatitude || lat > geohash.MaxLatitude {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR latitude is not a float or out of range"}
+	}
+
+	r, err := strconv.ParseFloat(args[5].Bulk, 64)
+	if err != nil {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR radius is not a float or out of range"}
+	}
+
+	r = radiusToKm(r, args[6].Bulk)
+	ret := resp.Value{Typ: resp.ARRAY_TYPE}
+	for _, location := range *set {
+		pos := geohash.DecodeGeoScore(int(location.Score))
+		dist := geohash.Hsdist(geohash.DegPos(lat, long), geohash.DegPos(pos.Lat, pos.Long))
+		if dist <= r {
+			ret.Array = append(ret.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: location.Member})
+		}
+	}
+
+	return ret
+}
+
+func radiusToKm(radius float64, unit string) float64 {
+	switch unit {
+	case "m":
+		return radius / 1000
+	case "mi":
+		return radius * 1.609
+	default:
+		return radius
+	}
 }
