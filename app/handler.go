@@ -1139,7 +1139,7 @@ func geodist(args []resp.Value) resp.Value {
 	pos2 := geohash.DecodeGeoScore(int((*set)[idx2].Score))
 	dist := geohash.Hsdist(geohash.DegPos(pos1.Lat, pos1.Long), geohash.DegPos(pos2.Lat, pos2.Long))
 
-	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(dist * 1000)}
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: fmt.Sprint(dist)}
 }
 
 func geosearch(args []resp.Value) resp.Value {
@@ -1155,7 +1155,7 @@ func geosearch(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.NULL_ARRAY}
 	}
 
-	long, err := strconv.ParseFloat(args[3].Bulk, 64)
+	long, err := strconv.ParseFloat(args[2].Bulk, 64)
 	if err != nil || long < geohash.MinLongitude || long > geohash.MaxLongitude {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR longitude is not a float or out of range"}
 	}
@@ -1170,7 +1170,7 @@ func geosearch(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR radius is not a float or out of range"}
 	}
 
-	r = radiusToKm(r, args[6].Bulk)
+	r = radiusToM(r, args[6].Bulk)
 	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	for _, location := range *set {
 		pos := geohash.DecodeGeoScore(int(location.Score))
@@ -1183,12 +1183,12 @@ func geosearch(args []resp.Value) resp.Value {
 	return ret
 }
 
-func radiusToKm(radius float64, unit string) float64 {
+func radiusToM(radius float64, unit string) float64 {
 	switch unit {
-	case "m":
-		return radius / 1000
+	case "km":
+		return radius * 1000
 	case "mi":
-		return radius * 1.609
+		return radius * 1609.34
 	default:
 		return radius
 	}

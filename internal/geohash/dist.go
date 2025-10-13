@@ -2,7 +2,7 @@ package geohash
 
 import "math"
 
-const rearth = 6372.797560856 // km
+const rearth = 6372797.560856 // m
 
 func haversine(θ float64) float64 {
 	return .5 * (1 - math.Cos(θ))
