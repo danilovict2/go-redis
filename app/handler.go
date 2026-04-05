@@ -51,6 +51,7 @@ var Handlers = map[string]Handler{
 	"GEODIST":   geodist,
 	"GEOSEARCH": geosearch,
 	"ACL":       acl,
+	"AUTH":      authenticate,
 }
 
 var (
@@ -1198,7 +1199,7 @@ func radiusToM(radius float64, unit string) float64 {
 
 func acl(args []resp.Value) resp.Value {
 	if len(args) == 0 {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'acl' command"}
 	}
 
 	switch args[0].Bulk {
@@ -1215,7 +1216,7 @@ func acl(args []resp.Value) resp.Value {
 
 func getuser(args []resp.Value) resp.Value {
 	if len(args) == 0 {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl|getuser' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'acl|getuser' command"}
 	}
 
 	user, ok := server.users[args[0].Bulk]
@@ -1246,7 +1247,7 @@ func getuser(args []resp.Value) resp.Value {
 
 func setuser(args []resp.Value) resp.Value {
 	if len(args) < 2 {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl|setuser' command"}
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'acl|setuser' command"}
 	}
 
 	user, ok := server.users[args[0].Bulk]
@@ -1258,6 +1259,20 @@ func setuser(args []resp.Value) resp.Value {
 	user.passwords = append(user.passwords, auth.Encrypt(password))
 	user.flags = slices.DeleteFunc(user.flags, func(flag string) bool { return flag == "nopass" })
 	server.users[args[0].Bulk] = user
+
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
+
+func authenticate(args []resp.Value) resp.Value {
+	if len(args) < 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'auth' command"}
+	}
+
+	username, password := args[0].Bulk, args[1].Bulk
+	user, ok := server.users[username]
+	if !ok || !slices.Contains(user.passwords, auth.Encrypt(password)) {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "WRONGPASS invalid username-password pair or user is disabled."}
+	}
 
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }

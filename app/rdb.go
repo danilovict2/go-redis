@@ -10,11 +10,9 @@ import (
 )
 
 const (
-	opCodeAUX          byte = 250
 	opCodeRESIZEDB     byte = 251
 	opCodeEXPIRETIMEMS byte = 252
 	opCodeEXPIRETIME   byte = 253
-	opCodeSELECTDB     byte = 254
 	opCodeEOF          byte = 255
 )
 
@@ -45,7 +43,7 @@ func readFile(path string) error {
 	}
 
 	type Expiry struct {
-		Option byte
+		Option      byte
 		UntilExpiry string
 	}
 
@@ -57,7 +55,7 @@ func readFile(path string) error {
 
 		if expireOption == opCodeEXPIRETIMEMS {
 			i64 := binary.LittleEndian.Uint64(content[j+1 : j+9])
-			unixTimeUTC := time.Unix(0, int64(i64) * int64(time.Millisecond)).UTC()
+			unixTimeUTC := time.Unix(0, int64(i64)*int64(time.Millisecond)).UTC()
 			j += 9
 			expiry.UntilExpiry = strconv.Itoa(int(time.Until(unixTimeUTC).Seconds()))
 		}
@@ -93,7 +91,6 @@ func readFile(path string) error {
 
 		set(args)
 	}
-	
 
 	return nil
 }
