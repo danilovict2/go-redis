@@ -33,6 +33,11 @@ type SubscribeChan struct {
 	subscribers int
 }
 
+type User struct {
+	flags     []string
+	passwords []string
+}
+
 type Server struct {
 	configs        map[string]string
 	replconf       ReplicaConfig
@@ -41,6 +46,7 @@ type Server struct {
 	broadcastch    chan []byte
 	subscribeChans map[string]*SubscribeChan
 	offset         int
+	users          map[string]User
 }
 
 var server *Server
@@ -70,11 +76,18 @@ func NewServer() *Server {
 		replconf:       replconf,
 		broadcastch:    make(chan []byte),
 		subscribeChans: map[string]*SubscribeChan{},
+		users:          make(map[string]User),
 	}
 
 	server.configs["port"] = *port
 	server.configs["dir"] = *dir
 	server.configs["dbfilename"] = *dbfilename
+
+	defaultUser := User{
+		flags: []string{"nopass"},
+	}
+
+	server.users["default"] = defaultUser
 
 	return server
 }

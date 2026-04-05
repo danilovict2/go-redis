@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/codecrafters-io/redis-starter-go/internal/auth"
 	"github.com/codecrafters-io/redis-starter-go/internal/geohash"
 	"github.com/codecrafters-io/redis-starter-go/internal/resp"
 	s "github.com/codecrafters-io/redis-starter-go/internal/set"
@@ -1205,21 +1206,58 @@ func acl(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.BULK_TYPE, Bulk: "default"}
 	case "GETUSER":
 		return getuser(args[1:])
+	case "SETUSER":
+		return setuser(args[1:])
 	default:
 		return resp.Value{}
 	}
 }
 
 func getuser(args []resp.Value) resp.Value {
+	if len(args) == 0 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl|getuser' command"}
+	}
+
+	user, ok := server.users[args[0].Bulk]
+	if !ok {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
 	res := resp.Value{Typ: resp.ARRAY_TYPE}
 	res.Array = append(res.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "flags"})
 
 	flags := resp.Value{Typ: resp.ARRAY_TYPE}
-	flags.Array = append(flags.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "nopass"})
+	for _, flag := range user.flags {
+		flags.Array = append(flags.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: flag})
+	}
+
 	res.Array = append(res.Array, flags)
 
 	res.Array = append(res.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "passwords"})
-	res.Array = append(res.Array, resp.Value{Typ: resp.ARRAY_TYPE})
 
+	passwords := resp.Value{Typ: resp.ARRAY_TYPE}
+	for _, password := range user.passwords {
+		passwords.Array = append(passwords.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: password})
+	}
+
+	res.Array = append(res.Array, passwords)
 	return res
+}
+
+func setuser(args []resp.Value) resp.Value {
+	if len(args) < 2 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl|setuser' command"}
+	}
+
+	user, ok := server.users[args[0].Bulk]
+	if !ok {
+		return resp.Value{Typ: resp.NULL_TYPE}
+	}
+
+	password := args[1].Bulk[1:]
+	user.passwords = append(user.passwords, auth.Encrypt(password))
+	user.flags = slices.DeleteFunc(user.flags, func(flag string) bool { return flag == "nopass" })
+	server.users[args[0].Bulk] = user
+
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
