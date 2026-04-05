@@ -1204,8 +1204,22 @@ func acl(args []resp.Value) resp.Value {
 	case "WHOAMI":
 		return resp.Value{Typ: resp.BULK_TYPE, Bulk: "default"}
 	case "GETUSER":
-		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "flags"}, {Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "nopass"}}}}}
+		return getuser(args[1:])
 	default:
 		return resp.Value{}
 	}
+}
+
+func getuser(args []resp.Value) resp.Value {
+	res := resp.Value{Typ: resp.ARRAY_TYPE}
+	res.Array = append(res.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "flags"})
+
+	flags := resp.Value{Typ: resp.ARRAY_TYPE}
+	flags.Array = append(flags.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "nopass"})
+	res.Array = append(res.Array, flags)
+
+	res.Array = append(res.Array, resp.Value{Typ: resp.BULK_TYPE, Bulk: "passwords"})
+	res.Array = append(res.Array, resp.Value{Typ: resp.ARRAY_TYPE})
+
+	return res
 }
