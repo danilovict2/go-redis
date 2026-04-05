@@ -1203,6 +1203,8 @@ func acl(args []resp.Value) resp.Value {
 	switch args[0].Bulk {
 	case "WHOAMI":
 		return resp.Value{Typ: resp.BULK_TYPE, Bulk: "default"}
+	case "GETUSER":
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "flags"}, {Typ: resp.ARRAY_TYPE}}}
 	default:
 		return resp.Value{}
 	}
