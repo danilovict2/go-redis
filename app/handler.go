@@ -49,6 +49,7 @@ var Handlers = map[string]Handler{
 	"GEOPOS":    geopos,
 	"GEODIST":   geodist,
 	"GEOSEARCH": geosearch,
+	"ACL":       acl,
 }
 
 var (
@@ -70,7 +71,7 @@ func echo(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of args for 'echo' command"}
 	}
 
-	return resp.Value{Typ: resp.STRING_TYPE, Str: args[0].Bulk}
+	return resp.Value{Typ: resp.BULK_TYPE, Bulk: args[0].Bulk}
 }
 
 var SETs = map[string]string{}
@@ -517,7 +518,7 @@ func xread(args []resp.Value) resp.Value {
 	}
 
 	if !foundEntry {
-		return resp.Value{Typ: resp.NULL_TYPE}
+		return resp.Value{Typ: resp.NULL_ARRAY}
 	}
 
 	return ret
@@ -1191,5 +1192,18 @@ func radiusToM(radius float64, unit string) float64 {
 		return radius * 1609.34
 	default:
 		return radius
+	}
+}
+
+func acl(args []resp.Value) resp.Value {
+	if len(args) == 0 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "(error) ERR wrong number of arguments for 'acl' command"}
+	}
+
+	switch args[0].Bulk {
+	case "WHOAMI":
+		return resp.Value{Typ: resp.BULK_TYPE, Bulk: "default"}
+	default:
+		return resp.Value{}
 	}
 }
