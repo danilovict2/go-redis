@@ -1204,7 +1204,7 @@ func acl(args []resp.Value) resp.Value {
 	case "WHOAMI":
 		return resp.Value{Typ: resp.BULK_TYPE, Bulk: "default"}
 	case "GETUSER":
-		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "flags"}, {Typ: resp.ARRAY_TYPE}}}
+		return resp.Value{Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "flags"}, {Typ: resp.ARRAY_TYPE, Array: []resp.Value{{Typ: resp.BULK_TYPE, Bulk: "nopass"}}}}}
 	default:
 		return resp.Value{}
 	}
