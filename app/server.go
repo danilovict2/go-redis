@@ -196,6 +196,13 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(exec(&queue))
 		case "DISCARD":
 			writer.Write(discard(&queue))
+		case "WATCH":
+			if queue.active {
+				writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR WATCH inside MULTI is not allowed"})
+				continue
+			}
+
+			writer.Write(watch(value.Array[1:]))
 		case "SUBSCRIBE":
 			subscribedMode = true
 			out := subscribe(value.Array[1:], subscribes)

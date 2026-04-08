@@ -52,7 +52,6 @@ var Handlers = map[string]Handler{
 	"GEOSEARCH": geosearch,
 	"ACL":       acl,
 	"AUTH":      authenticate,
-	"WATCH":     watch,
 }
 
 var (
@@ -581,6 +580,14 @@ func discard(queue *Queue) resp.Value {
 
 	queue.active = false
 	queue.items = nil
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
+
+func watch(args []resp.Value) resp.Value {
+	if len(args) < 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'watch' command"}
+	}
+
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 
@@ -1278,10 +1285,3 @@ func authenticate(args []resp.Value) resp.Value {
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 
-func watch(args []resp.Value) resp.Value {
-	if len(args) < 1 {
-		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'watch' command"}
-	}
-
-	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
-}
