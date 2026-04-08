@@ -52,6 +52,7 @@ var Handlers = map[string]Handler{
 	"GEOSEARCH": geosearch,
 	"ACL":       acl,
 	"AUTH":      authenticate,
+	"WATCH":     watch,
 }
 
 var (
@@ -1272,6 +1273,14 @@ func authenticate(args []resp.Value) resp.Value {
 	user, ok := server.users[username]
 	if !ok || !slices.Contains(user.passwords, auth.Encrypt(password)) {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "WRONGPASS invalid username-password pair or user is disabled."}
+	}
+
+	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
+}
+
+func watch(args []resp.Value) resp.Value {
+	if len(args) < 1 {
+		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'watch' command"}
 	}
 
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
