@@ -34,6 +34,7 @@ type SubscribeChan struct {
 }
 
 type User struct {
+	username  string
 	flags     []string
 	passwords []string
 }
@@ -84,7 +85,8 @@ func NewServer() *Server {
 	server.configs["dbfilename"] = *dbfilename
 
 	defaultUser := User{
-		flags: []string{"nopass"},
+		username: "default",
+		flags:    []string{"nopass"},
 	}
 
 	server.users["default"] = defaultUser
@@ -145,6 +147,12 @@ func (s *Server) Handle(conn net.Conn) {
 	subscribedMode := false
 	unsubscribeChans := make(map[string]chan struct{})
 
+	user := User{}
+	defaultUser := server.users["default"]
+	if slices.Contains(defaultUser.flags, "nopass") {
+		user = defaultUser
+	}
+
 	for {
 		value, err := res.Read()
 		if errors.Is(err, io.EOF) {
@@ -165,9 +173,13 @@ func (s *Server) Handle(conn net.Conn) {
 			continue
 		}
 
-		command := strings.ToUpper(value.Array[0].Bulk)
 		writer := NewWriter(conn)
+		if user.username == "" {
+			writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: "NOAUTH Authentication required."})
+			continue
+		}
 
+		command := strings.ToUpper(value.Array[0].Bulk)
 		if subscribedMode && !slices.Contains(SubscribedModeCommands, command) {
 			writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: fmt.Sprintf("ERR Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command)})
 			continue
@@ -200,6 +212,13 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(unsubscribe(value.Array[1:], subscribes, unsubscribeChans))
 		case "PING":
 			writer.Write(ping(subscribedMode))
+		case "AUTH":
+			r := authenticate(value.Array[1:])
+			if r.Typ != resp.ERROR_TYPE {
+				user = defaultUser
+			}
+
+			writer.Write(r)
 		default:
 			handler, ok := Handlers[command]
 			if !ok {
