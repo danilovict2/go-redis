@@ -174,12 +174,12 @@ func (s *Server) Handle(conn net.Conn) {
 		}
 
 		writer := NewWriter(conn)
-		if user.username == "" {
+		command := strings.ToUpper(value.Array[0].Bulk)
+		if user.username == "" && command != "AUTH" {
 			writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: "NOAUTH Authentication required."})
 			continue
 		}
 
-		command := strings.ToUpper(value.Array[0].Bulk)
 		if subscribedMode && !slices.Contains(SubscribedModeCommands, command) {
 			writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: fmt.Sprintf("ERR Can't execute '%s': only (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET are allowed in this context", command)})
 			continue
