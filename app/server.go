@@ -48,6 +48,7 @@ type Server struct {
 	subscribeChans map[string]*SubscribeChan
 	offset         int
 	users          map[string]User
+	watched        map[string]bool
 }
 
 var server *Server
@@ -78,6 +79,7 @@ func NewServer() *Server {
 		broadcastch:    make(chan []byte),
 		subscribeChans: map[string]*SubscribeChan{},
 		users:          make(map[string]User),
+		watched:        make(map[string]bool),
 	}
 
 	server.configs["port"] = *port
@@ -185,6 +187,14 @@ func (s *Server) Handle(conn net.Conn) {
 			continue
 		}
 
+		isWriteCommand := slices.Contains(WriteCommands, command)
+		if isWriteCommand {
+			key := value.Array[1].Bulk
+			if _, ok := server.watched[key]; ok {
+				server.watched[key] = true
+			}
+		}
+
 		switch command {
 		case "MULTI":
 			if queue.active {
@@ -194,6 +204,8 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(multi(&queue))
 		case "EXEC":
 			writer.Write(exec(&queue))
+
+			clear(server.watched)
 		case "DISCARD":
 			writer.Write(discard(&queue))
 		case "WATCH":
@@ -246,7 +258,6 @@ func (s *Server) Handle(conn net.Conn) {
 			}
 		}
 
-		isWriteCommand := slices.Contains(WriteCommands, command)
 		if isWriteCommand || (command == "REPLCONF" && strings.ToUpper(value.Array[1].Bulk) == "GETACK") && len(s.slaves) > 0 {
 			s.broadcastch <- value.Marshal()
 		}

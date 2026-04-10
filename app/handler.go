@@ -562,6 +562,14 @@ func exec(queue *Queue) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR EXEC without MULTI"}
 	}
 
+	defer func() { queue.active = false }()
+
+	for _, touched := range server.watched {
+		if touched {
+			return resp.Value{Typ: resp.NULL_ARRAY}
+		}
+	}
+
 	ret := resp.Value{Typ: resp.ARRAY_TYPE}
 	for _, item := range queue.items {
 		command := strings.ToUpper(item.Array[0].Bulk)
@@ -569,7 +577,6 @@ func exec(queue *Queue) resp.Value {
 		ret.Array = append(ret.Array, ExecuteCommand(handler, item.Array[1:]))
 	}
 
-	queue.active = false
 	return ret
 }
 
@@ -588,6 +595,8 @@ func watch(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'watch' command"}
 	}
 
+	key := args[0].Bulk
+	server.watched[key] = false
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 
@@ -1284,4 +1293,3 @@ func authenticate(args []resp.Value) resp.Value {
 
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
-
