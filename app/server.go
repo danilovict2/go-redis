@@ -215,6 +215,9 @@ func (s *Server) Handle(conn net.Conn) {
 			}
 
 			writer.Write(watch(value.Array[1:]))
+		case "UNWATCH":
+			clear(server.watched)
+			writer.Write(resp.Value{Typ: resp.STRING_TYPE, Str: "OK"})
 		case "SUBSCRIBE":
 			subscribedMode = true
 			out := subscribe(value.Array[1:], subscribes)
