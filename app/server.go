@@ -188,7 +188,7 @@ func (s *Server) Handle(conn net.Conn) {
 		}
 
 		isWriteCommand := slices.Contains(WriteCommands, command)
-		if isWriteCommand {
+		if isWriteCommand && len(value.Array) > 1 {
 			key := value.Array[1].Bulk
 			if _, ok := server.watched[key]; ok {
 				server.watched[key] = true

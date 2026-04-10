@@ -564,8 +564,8 @@ func exec(queue *Queue) resp.Value {
 
 	defer func() { queue.active = false }()
 
-	for _, touched := range server.watched {
-		if touched {
+	for _, wasTouched := range server.watched {
+		if wasTouched {
 			return resp.Value{Typ: resp.NULL_ARRAY}
 		}
 	}
@@ -595,8 +595,11 @@ func watch(args []resp.Value) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR wrong number of arguments for 'watch' command"}
 	}
 
-	key := args[0].Bulk
-	server.watched[key] = false
+	for _, arg := range args {
+		key := arg.Bulk
+		server.watched[key] = false
+	}
+
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 
