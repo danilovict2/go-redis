@@ -562,7 +562,7 @@ func exec(queue *Queue) resp.Value {
 		return resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR EXEC without MULTI"}
 	}
 
-	defer func() { queue.active = false }()
+	defer func() { queue.active = false; queue.items = queue.items[:0] }()
 
 	for _, wasTouched := range server.watched {
 		if wasTouched {
@@ -586,7 +586,8 @@ func discard(queue *Queue) resp.Value {
 	}
 
 	queue.active = false
-	queue.items = nil
+	queue.items = queue.items[:0]
+
 	return resp.Value{Typ: resp.STRING_TYPE, Str: "OK"}
 }
 

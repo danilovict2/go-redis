@@ -204,11 +204,10 @@ func (s *Server) Handle(conn net.Conn) {
 			writer.Write(multi(&queue))
 		case "EXEC":
 			writer.Write(exec(&queue))
-
-			queue.items = make([]resp.Value, 0)
 			clear(server.watched)
 		case "DISCARD":
 			writer.Write(discard(&queue))
+			clear(server.watched)
 		case "WATCH":
 			if queue.active {
 				writer.Write(resp.Value{Typ: resp.ERROR_TYPE, Str: "ERR WATCH inside MULTI is not allowed"})
