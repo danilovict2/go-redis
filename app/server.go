@@ -205,6 +205,7 @@ func (s *Server) Handle(conn net.Conn) {
 		case "EXEC":
 			writer.Write(exec(&queue))
 
+			queue.items = make([]resp.Value, 0)
 			clear(server.watched)
 		case "DISCARD":
 			writer.Write(discard(&queue))
