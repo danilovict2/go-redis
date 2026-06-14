@@ -55,6 +55,32 @@ redis-cli
 * `XRANGE`
 * `XREAD`
 * `INCR`
+* `RPUSH`
+* `LPUSH`
+* `LRANGE`
+* `LLEN`
+* `LPOP`
+* `BLPOP`
+* `ZADD`
+* `ZRANK`
+* `ZRANGE`
+* `ZCARD`
+* `ZSCORE`
+* `ZREM`
+* `GEOADD`
+* `GEOPOS`
+* `GEODIST`
+* `GEOSEARCH`
+* `SUBSCRIBE`
+* `UNSUBSCRIBE`
+* `PUBLISH`
+* `MULTI`
+* `EXEC`
+* `DISCARD`
+* `WATCH`
+* `UNWATCH`
+* `AUTH`
+* `ACL`
 
 ## Examples
 
@@ -296,6 +322,193 @@ $ redis-cli -p <PORT> XADD some_key 1526985054079-0 temperature 37 humidity 94
 
 $ redis-cli BLPOP list_key 0.1
 # (Blocks for 0.1 seconds)
+```
+
+### Sorted Sets
+
+#### Adding members
+
+```bash
+> ZADD scores 10 alice
+(integer) 1
+> ZADD scores 20 bob
+(integer) 1
+> ZADD scores 15 carol
+(integer) 1
+```
+
+#### Querying members
+
+```bash
+# Number of members in the set
+> ZCARD scores
+(integer) 3
+
+# Rank of a member (lowest score first, 0-based)
+> ZRANK scores bob
+(integer) 2
+
+# Score of a member
+> ZSCORE scores carol
+"15"
+
+# Members in a rank range, ordered by score
+> ZRANGE scores 0 -1
+1) "alice"
+2) "carol"
+3) "bob"
+```
+
+#### Removing members
+
+```bash
+> ZREM scores bob
+(integer) 1
+```
+
+### Geospatial
+
+The geospatial commands store coordinates as members of a sorted set, so positions are encoded by their longitude and latitude.
+
+#### Adding locations
+
+```bash
+> GEOADD places 13.361389 38.115556 "Palermo"
+(integer) 1
+> GEOADD places 15.087269 37.502669 "Catania"
+(integer) 1
+```
+
+#### Querying positions and distance
+
+```bash
+# Position of one or more members
+> GEOPOS places Palermo
+1) 1) "13.361389"
+   2) "38.115556"
+
+# Distance between two members (in meters by default)
+> GEODIST places Palermo Catania
+"166274.1516"
+```
+
+#### Searching by radius
+
+Search for members within a given radius of a longitude/latitude. The radius unit can be `m`, `km` or `mi`:
+
+```bash
+> GEOSEARCH places FROMLONLAT 15 37 BYRADIUS 200 km
+1) "Palermo"
+2) "Catania"
+```
+
+### Pub/Sub
+
+#### Subscribing to a channel
+
+```bash
+> SUBSCRIBE news
+1) "subscribe"
+2) "news"
+3) (integer) 1
+
+# ... this connection now blocks, waiting for messages
+```
+
+#### Publishing a message
+
+In another terminal, publish a message to the channel:
+
+```bash
+$ redis-cli PUBLISH news "hello"
+```
+
+The subscriber will then receive:
+
+```bash
+1) "message"
+2) "news"
+3) "hello"
+```
+
+#### Unsubscribing
+
+```bash
+> UNSUBSCRIBE news
+```
+
+### Transactions
+
+A transaction lets you queue multiple commands and run them together with `EXEC`.
+
+#### Running a transaction
+
+```bash
+> MULTI
+OK
+> SET foo 1
+QUEUED
+> INCR foo
+QUEUED
+> EXEC
+1) OK
+2) (integer) 2
+```
+
+#### Aborting a transaction
+
+Use `DISCARD` to throw away a queued transaction without running it:
+
+```bash
+> MULTI
+OK
+> SET foo 1
+QUEUED
+> DISCARD
+OK
+```
+
+#### Watching keys
+
+`WATCH` marks keys for optimistic locking. If a watched key is modified before `EXEC`, the transaction is aborted. `UNWATCH` clears all watched keys, and `DISCARD` also clears them automatically:
+
+```bash
+> WATCH foo
+OK
+> MULTI
+OK
+> INCR foo
+QUEUED
+> EXEC
+# Aborts if foo was changed by another client after WATCH
+```
+
+### Authentication
+
+The server starts with a `default` user that requires no password. You can add a password to a user with `ACL SETUSER` and then authenticate with `AUTH`.
+
+#### Inspecting users
+
+```bash
+# The currently authenticated user
+> ACL WHOAMI
+"default"
+
+# The flags and passwords configured for a user
+> ACL GETUSER default
+1) "flags"
+2) 1) "nopass"
+3) "passwords"
+4) (empty array)
+```
+
+#### Setting a password and authenticating
+
+```bash
+> ACL SETUSER default >mypassword
+OK
+> AUTH default mypassword
+OK
 ```
 
 
